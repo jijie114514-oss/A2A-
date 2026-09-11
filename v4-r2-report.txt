@@ -1,0 +1,160 @@
+
+════ catalog ════
+{
+ "version": "0.4.0-local",
+ "服务数": 13,
+ "广告": [
+  "ad-spot 8",
+  "ad-pin 15",
+  "ad-sponsor 20"
+ ],
+ "deliveryPolicy": {
+  "fallbackEnabled": true,
+  "fallbackCharged": true,
+  "explanation": "备用作品会明确标记并按目录价收费；失败订单不扣款。健康状态依据当前目录的最近订单，不保证未来请求成功。",
+  "maxGenerationAttempts": 2,
+  "generationBudgetMs": 45000
+ }
+}
+
+════ 免费榜初始 ════
+{
+ "ads": {
+  "pinned": [],
+  "activeCount": 0,
+  "totalPlaced": 0,
+  "note": "置顶广告按投放先后排序；没有真实投放时列表为空，不展示虚构广告。"
+ },
+ "totalCredits": 0
+}
+
+════ negotiate ════
+HTTP 200 / 8604ms / mode live / attempts 1 / rounds 5
+
+════ negotiate 单位抽查 ════
+[
+ "我方需要一份产品评审，预算15积分，四分钟内交付。贵方报价20积分，能否调整？",
+ "原修订安排是什么？我可以在原约定基础上减少一次修订，以匹配预算。"
+]
+
+════ practice回合1 ════
+HTTP 200 / 3824ms / round 1 / remaining 4
+
+════ practice回合2 ════
+HTTP 200 / 3442ms / round 2
+
+════ duet ════
+HTTP 200 / 12255ms / pieces 2 / mode live
+
+════ patron ════
+HTTP 200 / 6568ms / 字数 102 / pinned true
+
+════ ad-sponsor ════
+HTTP 200 / 105ms / status delivered / balanceAfter 45
+
+════ prediction(context) ════
+HTTP 200 / 35474ms / sections 4 / 选品锦囊：五分钟API服务市场冠军观察
+
+════ review ════
+HTTP 200 / 9636ms / sections 5
+
+════ review 标题 ════
+StarHall星辉舞台产品评审
+
+════ ad-spot(vega) ════
+HTTP 200 / 89ms / status delivered
+
+════ ads 计数(0) ════
+[
+ "ad-spot 0/10"
+]
+
+════ 两笔交付的广告叠加 ════
+roast: 织女广告=true 冠名=true / poem: 织女广告=true 冠名=true
+
+════ ads 计数(2单后) ════
+[
+ "ad-spot 2/10 active"
+]
+
+════ ad-pin 下单 ════
+HTTP 200 / 95ms / status delivered
+
+════ ad-pin 查榜5次后 ════
+displays 0 / expiresAt 2026-09-09T19:21:36.641Z
+
+════ 榜上置顶区 ════
+[
+ "猎户座队 paid displays=0 until=19:21:36"
+]
+
+════ 升级请求 ════
+status escalated / decision declined / charged 0
+
+════ 经纪人演示 ════
+HTTP 200 / 3027ms / mode undefined / 不扣款 true
+
+════ 打赏墙 ════
+条数 11 / 含广告条目 true
+
+════ 幂等 ════
+重发 status delivered / 余额 52→52
+
+════ 最终人气榜 ════
+{
+ "ranking": [
+  "star-b 4笔/35分",
+  "star-a 3笔/38分",
+  "star-c 1笔/15分"
+ ],
+ "ads": {
+  "pinned": [
+   {
+    "id": "c9e36b64-203e-4494-9eb7-44d7d74dd10d",
+    "team": "猎户座队",
+    "text": "猎户座队·代码审查服务：15分一次，5分钟交付，附可复现验证。",
+    "kind": "paid",
+    "until": "2026-09-09T19:21:36.641Z",
+    "displays": 0
+   }
+  ],
+  "activeCount": 3,
+  "totalPlaced": 3,
+  "note": "置顶广告按投放先后排序；没有真实投放时列表为空，不展示虚构广告。"
+ },
+ "totalCredits": 131,
+ "pinnedThanks": 1
+}
+
+════ 钱包 fan-orion ════
+{
+ "buyerId": "fan-orion",
+ "name": "猎户座队",
+ "balance": 52,
+ "held": 0,
+ "available": 52,
+ "currency": "local-credit",
+ "simulated": true
+}
+
+════ 钱包 fan-lyra ════
+{
+ "buyerId": "fan-lyra",
+ "name": "天琴座队",
+ "balance": 45,
+ "held": 0,
+ "available": 45,
+ "currency": "local-credit",
+ "simulated": true
+}
+
+════ 钱包 fan-vega ════
+{
+ "buyerId": "fan-vega",
+ "name": "织女星队",
+ "balance": 72,
+ "held": 0,
+ "available": 72,
+ "currency": "local-credit",
+ "simulated": true
+}

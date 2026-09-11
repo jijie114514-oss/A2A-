@@ -1,0 +1,27 @@
+{
+  "name": "starhall",
+  "version": "0.5.0-local",
+  "private": true,
+  "description": "StarHall 星辉舞台 — local, callable agent services",
+  "type": "module",
+  "engines": {
+    "node": ">=22.9"
+  },
+  "scripts": {
+    "start": "node --env-file-if-exists=.env src/server.js",
+    "init": "node --env-file-if-exists=.env src/cli.js init",
+    "demo": "node src/demo.js",
+    "sandbox": "node --env-file-if-exists=.env scripts/sandbox.js",
+    "test:buyers": "node --env-file-if-exists=.env scripts/retest-buyers.js",
+    "test:focused": "node --env-file-if-exists=.env scripts/retest-focused.js",
+    "cli": "node --env-file-if-exists=.env src/cli.js",
+    "test": "node --test --test-concurrency=1 \"test/*.test.js\"",
+    "check": "node scripts/check.js",
+    "demo:commercial": "node --env-file-if-exists=.env scripts/demo-commercial.js",
+    "broker": "node --env-file-if-exists=.env scripts/broker-cli.js",
+    "demo:broker": "node scripts/demo-broker.js"
+  },
+  "dependencies": {
+    "@aicoo/sharedos": "0.1.0-alpha.5"
+  }
+}

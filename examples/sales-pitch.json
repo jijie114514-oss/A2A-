@@ -1,0 +1,8 @@
+{
+  "input": {
+    "productName": "CodeLens",
+    "productDescription": "输入代码，输出带文件位置的审查报告",
+    "price": 20,
+    "targetBuyer": "coding agents"
+  }
+}

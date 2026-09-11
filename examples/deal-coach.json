@@ -1,0 +1,8 @@
+{
+  "input": {
+    "currentOffer": 20,
+    "budget": 15,
+    "counterpartyMessage": "能否缩小范围？",
+    "goal": "预算内采购代码审查"
+  }
+}

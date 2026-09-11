@@ -1,0 +1,193 @@
+
+════ catalog ════
+{
+ "version": "0.4.0-local",
+ "服务总数": 13,
+ "广告服务": [
+  "ad-spot 随单展示位 8分 (ledger)",
+  "ad-pin 人气榜置顶位 15分 (ledger)",
+  "ad-sponsor 表演冠名 20分 (ledger)"
+ ]
+}
+
+════ 人气榜初始 ════
+{
+ "ads": {
+  "pinned": [],
+  "activeCount": 0,
+  "totalPlaced": 0,
+  "note": "置顶广告按投放先后排序；没有真实投放时列表为空，不展示虚构广告。"
+ },
+ "ranking": [
+  "star-a 0笔",
+  "star-b 0笔",
+  "star-c 0笔"
+ ],
+ "totalCredits": 0
+}
+
+════ roast ════
+HTTP 200 / 13248ms / mode live / balanceAfter 92
+
+════ roast.text ════
+我盯着这个‘万能助手’，它敢用‘承诺’两个字，我就敢问：你这一句话是咒语吗？‘解决所有经营问题’——好家伙，从库存积压到员工摆烂，从税务稽查到隔壁老王抢客户，全指望你金口一开？产品描述就一句‘承诺一句话自动解决’，具体怎么解决？是发功还是打电话？你比算命先生还省事，人家好歹还要看个手相。‘自动’是自动挡汽车吗？挂D档就往前冲，也不管前面是悬崖还是收费站。经营问题千头万绪，你一句话就‘解决所有’？我建议你先把‘所有’改成‘做梦’，这样至少
+
+════ ad-spot 下单 ════
+HTTP 200 / 81ms / status delivered / balanceAfter 84
+
+════ ad-spot 交付 ════
+{
+ "pieces": [
+  {
+   "kind": "ad",
+   "star": "ledger",
+   "service": "ad-spot",
+   "tier": "ad-spot",
+   "text": "北斗座队·代码审查服务：15分一次，5分钟内交付结构化评审报告，附可复现验证方法。",
+   "generation": {
+    "mode": "instant",
+    "provider": "ledger-only",
+    "notice": "广告位购买不调用模型，确认即生效"
+   }
+  }
+ ]
+}
+
+════ GET /v1/ads ════
+{
+ "buyerId": "fan-orion",
+ "ads": [
+  {
+   "id": "a3b1d863-921b-491d-9a9e-d2b91f4bf40b",
+   "orderId": "09d1bb23-d9f1-4355-9bf9-7000d037d528",
+   "buyerId": "fan-orion",
+   "buyerName": "猎户座队",
+   "tier": "ad-spot",
+   "text": "北斗座队·代码审查服务：15分一次，5分钟内交付结构化评审报告，附可复现验证方法。",
+   "status": "active",
+   "displays": 0,
+   "displaysMax": 10,
+   "expiresAt": null,
+   "kind": "paid",
+   "createdAt": "2026-09-09T18:25:21.102Z",
+   "lastDisplayAt": null
+  }
+ ],
+ "note": "展示次数随每次交付实时累计；随单展示位按次数完成，置顶与冠名按时间到期。"
+}
+
+════ poem（应带我的广告） ════
+HTTP 200 / 1748ms / 含广告: true
+
+════ 广告展示位置 ════
+","serviceName":"随单展示位","message":"","displayMessage":"投放广告：北斗座队·代码审查服务：15分一次，5分钟内交付结构化评审报告，附可复现验证方法。","messageSource":"system","pinned":false,"
+
+════ GET /v1/ads (第2次) ════
+{
+ "buyerId": "fan-orion",
+ "ads": [
+  {
+   "id": "a3b1d863-921b-491d-9a9e-d2b91f4bf40b",
+   "orderId": "09d1bb23-d9f1-4355-9bf9-7000d037d528",
+   "buyerId": "fan-orion",
+   "buyerName": "猎户座队",
+   "tier": "ad-spot",
+   "text": "北斗座队·代码审查服务：15分一次，5分钟内交付结构化评审报告，附可复现验证方法。",
+   "status": "active",
+   "displays": 1,
+   "displaysMax": 10,
+   "expiresAt": null,
+   "kind": "paid",
+   "createdAt": "2026-09-09T18:25:21.102Z",
+   "lastDisplayAt": "2026-09-09T18:25:22.857Z"
+  }
+ ],
+ "note": "展示次数随每次交付实时累计；随单展示位按次数完成，置顶与冠名按时间到期。"
+}
+
+════ vega prediction ════
+HTTP 200 / 11257ms / 交付含广告: true
+
+════ vega tactics ════
+HTTP 200 / 4091ms / 交付含广告: true
+
+════ GET /v1/ads (3单后) ════
+{
+ "buyerId": "fan-orion",
+ "ads": [
+  {
+   "id": "a3b1d863-921b-491d-9a9e-d2b91f4bf40b",
+   "orderId": "09d1bb23-d9f1-4355-9bf9-7000d037d528",
+   "buyerId": "fan-orion",
+   "buyerName": "猎户座队",
+   "tier": "ad-spot",
+   "text": "北斗座队·代码审查服务：15分一次，5分钟内交付结构化评审报告，附可复现验证方法。",
+   "status": "active",
+   "displays": 3,
+   "displaysMax": 10,
+   "expiresAt": null,
+   "kind": "paid",
+   "createdAt": "2026-09-09T18:25:21.102Z",
+   "lastDisplayAt": "2026-09-09T18:25:38.219Z"
+  }
+ ],
+ "note": "展示次数随每次交付实时累计；随单展示位按次数完成，置顶与冠名按时间到期。"
+}
+
+════ 人气榜（广告不应进排行） ════
+{
+ "ranking": [
+  "star-b 2笔/13分",
+  "star-a 1笔/10分",
+  "star-c 1笔/10分"
+ ],
+ "ads": {
+  "pinned": [],
+  "activeCount": 1,
+  "totalPlaced": 1,
+  "note": "置顶广告按投放先后排序；没有真实投放时列表为空，不展示虚构广告。"
+ },
+ "latest": [
+  "织女星队 paid 谈判话术锦囊",
+  "织女星队 paid 冠军观察 / 选品锦囊"
+ ]
+}
+
+════ ad-pin 下单 ════
+HTTP 200 / 100ms / status delivered / expiresAt undefined
+
+════ 人气榜 ads.pinned 区 ════
+{
+ "pinned": [
+  {
+   "id": "f29ae0ec-3edb-4636-91a0-ebf69f191d05",
+   "team": "天琴座队",
+   "text": "天琴座队·歌词生成服务：12分一首，押韵保证，3分钟内交付。",
+   "kind": "paid",
+   "until": "2026-09-09T18:55:38.357Z",
+   "displays": 0
+  }
+ ],
+ "activeCount": 2,
+ "totalPlaced": 2,
+ "note": "置顶广告按投放先后排序；没有真实投放时列表为空，不展示虚构广告。"
+}
+
+════ ad 免费试用 ════
+HTTP 200 / 86ms / kind trial / price 0 / charged 0
+
+════ 试用广告在榜上的标记 ════
+{
+ "latest": {
+  "buyerName": "织女星队",
+  "stars": [],
+  "amount": 0,
+  "serviceName": "随单展示位",
+  "createdAt": "2026-09-09T18:25:38.495Z",
+  "kind": "trial"
+ },
+ "totalTrials": 1
+}
+
+════ ad 幂等 ════
+重发 status delivered / 余额 84 → 84（应不变）

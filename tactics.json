@@ -1,0 +1,1 @@
+{"id":"7cab80b8-ddc7-4c18-86d4-5fd085e0f88a","buyerId":"fan-orion","service":"tactics","input":{"direction":"buy"},"message":"�ڶ��ֿ�����","price":10,"status":"failed","traceId":"1e551111-0ffb-46de-81cd-59bdcef3078f","createdAt":"2026-09-09T15:51:57.863Z","completedAt":"2026-09-09T15:52:12.918Z","error":{"code":"invalid_model_output","message":"模型生成失败，本单未完成交付"}}

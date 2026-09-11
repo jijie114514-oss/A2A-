@@ -1,0 +1,86 @@
+import { readFile, writeFile } from 'node:fs/promises';
+
+const directory = process.argv[2] || 'commercial-live-DLeWCD';
+const reportPath = `artifacts/${directory}/commercial-report.json`;
+const report = JSON.parse(await readFile(reportPath, 'utf8'));
+const testLog = await readFile('artifacts/commercial-tests.txt', 'utf8');
+const json = value => ['```json', JSON.stringify(value, null, 2), '```'].join('\n');
+const work = name => report[name].delivery.pieces[0];
+const select = (object, keys) => Object.fromEntries(keys.map(key => [key, object[key]]));
+const board = value => select(value, ['phase', 'ranking', 'activity', 'recentMarketMoves', 'sponsors', 'asOf']);
+const sample = select(work('diagnostic'), ['currentCommercialProfile', 'positioningDiagnosis', 'salesCommunicationDiagnosis', 'pricingDiagnosis', 'negotiationDiagnosis', 'distributionDiagnosis', 'mainBottleneck', 'recommendedNext3Actions', 'generation']);
+sample.evidenceSummary = { counts: work('diagnostic').evidenceSummary.counts, findings: work('diagnostic').evidenceSummary.findings,
+  evidenceExcerpt: work('diagnostic').evidenceSummary.evidence.slice(0, 4), fullEvidence: 'See diagnostic.delivery.pieces[0].evidenceSummary.evidence in the linked original JSON' };
+const sections = [
+  '# StarHall 0.5.0-local 产品架构升级报告',
+  `报告对应实际演练：${report.generatedAt}。这是增量本地升级；未部署、未提交。P0/P1/P2已接通，旧明星与账本结构继续使用。真实模型最后一轮Sales Pitch为live，Sales Stress Test为fallback；不会把备用交付说成模型零降级。`,
+  `完整原始输出：[本轮商业演练](../${reportPath})。接口与调用说明：[COMMERCIAL-API.md](COMMERCIAL-API.md)。`,
+  '## 1. 修改文件',
+  '| 范围 | 文件 | 变化 |\n| --- | --- | --- |\n| 新增核心模块 | src/commercial-catalog.js、src/sales.js、src/market.js、src/signals.js | 五商品契约、销售输出、评分/投放、信号/证据诊断 |\n| 原有服务与账本 | src/app.js、src/store.js、src/catalog.js、src/config.js | 复用结算/存档，增加商业路径与配置，目录分层 |\n| 模型与授权 | src/brain.js、src/output.js、src/kernel.js | 原模型修复/备用机制接入新服务，窄用途grants |\n| 路由与经纪人 | src/server.js、src/cli.js、src/arena.js、src/demo.js | 公共榜、私有档案、CLI和经纪人真实榜演示 |\n| 版本与运行 | package.json、package-lock.json、.env.example | 统一0.5.0、测试发现范围、商业演练脚本、评分配置 |\n| 自动测试 | test/commercial.test.js；test/app.test.js、test/http.test.js、test/context-regression.test.js、test/delivery-regression.test.js | 新验收；原断言只适配目录分层，保留旧行为覆盖 |\n| 示例和演练 | examples下五个商业商品JSON；scripts/demo-commercial.js、scripts/report-commercial.js | 独立100分账户全链路、原始报告和本报告生成 |\n| 文档 | README.md、产品方案、广告计划、改进清单、买方Agent测试脚本；docs/API.md、ARCHITECTURE.md、BROKER.md、DELIVERY-FIXES.md、COMMERCIAL-API.md、COMMERCIAL-UPGRADE.md | 当前契约与历史说明分开，记录实现和限制 |',
+  '升级前代码、测试、docs及package文件备份：[pre-commercial-upgrade.zip](../artifacts/pre-commercial-upgrade.zip)。未重置既有data，不修改.env或泄露API密钥。',
+  '## 2. 新增/修改endpoint',
+  '| Endpoint | 变化 |\n| --- | --- |\n| GET /v1/market-board | 新增，匿名/顾客/经纪人免费调用，可选幂等键 |\n| GET /v1/commercial-profile | 新增，仅当前顾客证据，不接受buyerId选择 |\n| GET /v1/catalog | 五商业商品＋免费榜，旧商品迁到extras.services |\n| POST /v1/orders、POST /v1/trials | 复用，新增五个service ID |\n| GET /v1/ads、GET /v1/ads/{id} | 增加明星、计划、实时与事件曝光、traffic统计 |\n| GET /v1/summary | 兼容，按新分数排序，旧pin真实查询累计曝光；经纪人仍被拒绝 |\n| GET /v1/orders?status=refunded | 可检索退款状态，未新增退款操作 |\n| 原成功交付、demo、practice | 增加compactMarketBoard与一项recommendedNextAction |',
+  '## 3. 最终核心catalog',
+  '这是本地API契约，为将来SharedNet挂牌准备；还没有真实SharedNet发布。',
+  json(report.catalog.services.map(s => ({ id: s.id, name: s.name, price: s.price, ...(s.plans ? { plans: s.plans } : {}), call: s.call }))),
+  '12个旧付费入口仍在CELEBRITY EXTRAS，既有订单ID及输入方式保留。catalog第一屏结构变化是有意的API契约调整，旧客户端需从extras.services取旧商品。',
+  '## 4. 三明星职责',
+  'A：Sales Communication，准备销售阶段，讲清价值。B：Sales Stress Test，分析自己商品的模拟异议、验证与风险。C：Deal Closing，处理授权价格区间和成交步骤；30分诊断也由C负责。仍只有三个明星；原娱乐persona供Extras使用。',
+  '## 5. Sales Pitch实际示例',
+  json({ input: report.pitch.input, output: select(work('pitch'), ['oneLinePitch', 'shortPitch', 'keyValuePoints', 'callToAction', 'contextFidelity', 'generation']) }),
+  '## 6. Sales Stress Test实际示例',
+  '以下为最终实测交付的本地备用作品，结构完整、明确SIMULATED。实际降级原因保留在generation中；10积分收费已按目录及fallback政策告知。',
+  json({ input: report.stress.input, output: select(work('stress'), ['topObjections', 'whyBuyerMayObject', 'severity', 'recommendedResponses', 'whatToFixBeforeSelling', 'evidenceType', 'generation']) }),
+  '## 7. Deal Coach实际示例',
+  '采用本地价格合同规则，不声称模型live。报价取授权区间内的候选值；预算小于底价时无可行区间，返回null并暂停。不会替买方执行交易。',
+  json({ input: report.deal.input, output: select(work('deal'), ['nextMessage', 'strategy', 'recommendedCounteroffer', 'concessionLevel', 'walkAwayCondition', 'risk', 'generation']) }),
+  '## 8. Commercial Signal schema',
+  '字段：id、buyerId、orderId、service、kind、at、evidenceClass、confidence、status、field、value、source、qualification（可选）。EXPLICIT=明确自报，HIGH不表示独立验证；BEHAVIORAL=使用带来的弱商业关注推断，LOW/INFERRED；OBSERVED=系统实际记录的事件。trial保留kind而不计paid支持。',
+  json(['EXPLICIT', 'BEHAVIORAL', 'OBSERVED'].map(c => report.profile.signals.find(s => s.evidenceClass === c))),
+  '## 9. Fan Support',
+  '成功delivered、paid、非广告且未退款的订单，按wallEntry.allocations将实际积分分配给明星。1积分=1分支持。duet保留A8/B7。trial/demo/failed/refunded都不计入。',
+  '## 10. Sponsor Support',
+  '成功paid且绑定明星的广告积分×SPONSOR_SUPPORT_WEIGHT，默认0.6。15积分→9分。旧未绑定广告不猜测归属。广告到期不撤销合法历史支持；退款撤销支持与活动资格。默认逻辑集中在market.js。',
+  '## 11. Star Score与曝光',
+  'Star Score=Fan Support+Sponsor Support。降序排名，平分按starId。默认曝光权重1.5/1.2/1.0可配置。共享广告槽在有效明星之间使用平滑加权轮转，同明星按当前曝光少者优先。37次同条件查询测试得到15/12/10次，没有赢家独占。activeSponsors是有效活动数，0/NONE、1/LOW、2–3/MEDIUM、>=4/HIGH，包括明确标trial的活动；不是去重广告主人数。',
+  '## 12. Sponsorship调用及即时激活',
+  json({ method: 'POST', path: '/v1/orders', headers: { Authorization: 'Bearer <customer-token>', 'Idempotency-Key': '<unique-key>', 'Content-Type': 'application/json' }, body: { service: 'star-sponsorship', input: report.sponsorship.input }, receipt: report.sponsorship.delivery.sponsorship }),
+  '按plan选择delivery8分/10次、leaderboard15分/30分钟、featured20分/30分钟；试用2次或5分钟。新广告独立附在赞助区，不改写主体内容。激活回执保持0次快照，实时读trackingEndpoint。',
+  '## 13. Market Board实际输出',
+  json(board(report.afterSponsorship)),
+  '## 14. Compact Board实际输出',
+  json(report.compactBoard),
+  '这次内容随另一买方的Deal Coach成功交付返回，是一次真实被动响应曝光；不证明被人阅读。',
+  '## 15. PRE-MARKET实际输出',
+  json(board(report.preMarket)),
+  '有1次TRIAL、0次DEMO；全部正式支持分为0。演示活动单独由自动化用例验证，不向此报告补造demo记录。',
+  '## 16. MARKET LIVE实际输出',
+  json(board(report.liveMarket)),
+  json({ adId: report.tracking.id, currentImpressions: report.tracking.currentImpressions, trackedImpressions: report.tracking.trackedImpressions, traffic: report.tracking.traffic, wallet: report.wallet }),
+  '本轮4次曝光=2次主动榜单+2次被动交付。买方主账户消费78分，余额22；另一测试买方消费15分。全是隔离的本地积分，没有真实Arena款项或流量。',
+  '## 17. Commercial Diagnostic实际示例',
+  '当前输入、本人历史服务、付费状态、试用、信号、赞助及当时实际曝光汇入同一证据索引。以下九节保留真实finding及引用；完整证据在原始JSON，不把他人fullWall快照或私有输入送入诊断。诊断取生成前快照，所以不包含它自己随后产生的曝光。',
+  json(sample),
+  '## 18. 新增测试结果',
+  '新增17项测试通过，覆盖用户Test A–I以及失败、私有读取拒绝、退款排除、重启、旧广告曝光、同明星轮转、真实抽检发现的币种/政策问题。不是主观买方满意度或排名评测。',
+  testLog.split(/\r?\n/).filter(line => /✔ (A\/E\/F:|B\/C\/D:|G\/H:|H:|C\/H:|I:|I\/permissions:|refund and|sales contracts:|HTTP core|config centralizes|delivery failure|restart retains|legacy pin|same-star|sales material|live regression)/.test(line)).map(line => '- ' + line.replace(/^✔ /, '')).join('\n'),
+  '## 19. 旧测试和完整验证',
+  '原有46项全部通过，保留诗、吐槽、套餐、谈判、广告、trial、idempotency、账本、权限、context与HTTP的行为断言。旧测试里目录查找改为Extras层；原遍历测试继续覆盖12个旧商品，新商品由新用例覆盖。总计63项通过、0失败、0跳过。',
+  '[完整自动测试日志](../artifacts/commercial-tests.txt) · [语法检查](../artifacts/commercial-check.txt) · [旧版端到端演练](../artifacts/commercial-legacy-demo.txt) · [隔离商业模板演练](../artifacts/commercial-demo-latest.json)。',
+  '真实DeepSeek三轮分开保存：\n\n| 轮次 | A文案 | B压力测试 | 发现与处理 |\n| --- | --- | --- | --- |\n| [第一轮](../artifacts/commercial-live-rhwgZD/commercial-report.json) | live 3805ms | fallback 21629ms | 人工发现文案写美元；补币种校验。B材料匹配过严，改用既有grounding并补提示 |\n| [第二轮](../artifacts/commercial-live-QyLuI3/commercial-report.json) | live 3865ms | live 8746ms | 人工发现B回复虚构“不存储代码”；随后新增政策/保证拦截 |\n| [最终轮](../artifacts/commercial-live-DLeWCD/commercial-report.json) | live 4112ms | fallback 25886ms | B两次输出未通过事实/价格校验，成功交付本地备用；其余服务即时/规则/证据引擎完成 |',
+  '不能把三轮挑选最好的结果拼成一次全部live成功。最终轮没有failed订单，但存在fallback。规则与证据引擎不消耗模型调用。',
+  '## 20. 发现的新bug',
+  '已修复：npm test误发现根目录手工脚本；package与目录版本不一致；旧置顶查询无曝光；历史广告回执跟着实时计数变化；以打赏次数排序与新分值不一致；退款记录仍计支持；模型将积分写法币；模型在推荐回复虚构数据保留政策；材料匹配使用固定中文块造成误拒绝。相应回归或端到端证据已保存。',
+  '仍有质量边界：关键词和已知断言校验不是完整事实判断；最后一轮B需备用。付费fallback已透明披露，纯模型合格率仍需后续独立买方实测。不能由63项技术测试推出商业文案高转化。',
+  '## 21. 未实现/刻意不做',
+  '未接入SharedOS Cloud、真实SharedNet目录、Arena房间/外部买家/正式积分/赛事时钟，也未部署或提交。没有真实买家接受/拒绝结果采集、点击、阅读回执、CTR、成交归因、ROI、独立用户去重或反刷量保证。没有退款操作入口，仅正确排除已有退款状态。广告无流量时计数保持0；delivery计划没有强制过期时间。\n\n按要求未做Critique Copilot、第四明星、十几个独立小商品、新网站/UI、假流量、假赞助、假市场趋势、心理画像。旧未绑定广告保留兼容，未伪造迁移成明星赞助。',
+  '## 22. grants与ledger边界',
+  '没有新增任意文件/网络/身份切换能力。新增用途均为exact grants：broker只能调用公开ledger/market-board；顾客commercial-profile强制本人；star-c只能按待交付诊断单请求该买方证据；ledger独立turn与存储grant仍需通过校验。诊断存储权限撤销、错误purpose、跨买方和manager私有读取均已验证拒绝。\n\n订单扣款、上墙、信号和曝光复用同一原子事务。trial/demo/paid隔离及失败释放预留不变。物理存储仍由本地可信主机共享，不冒充OS或云端租户隔离。',
+  '## 23. 陌生Buyer第一眼该买什么',
+  '先免费查看Live Market Board；第一笔付费建议Sales Pitch（8分）。只需自己的商品描述或场景，即可获得可直接使用的一句话介绍、短文案、价值要点和CTA，输入成本低且交付可读。已有明确报价与对手原话的买方可直接选Deal Coach。每次只给一个基于实际使用历史的下一步建议，不强迫把整条链买完。',
+  '## 产品闭环核验',
+  '小服务→原子交付与私有信号→Fan Support→实时排名→选择明星赞助→Sponsor Support→权重改变→实际响应曝光→OBSERVED证据→Commercial Diagnostic，在隔离本地账本中已成立。广告只是进入真实返回载荷，不等于Arena用户读过或转化；本地AUTO阶段也不代表已接入真实赛事。\n\n链路不需要人工现场改分、灌曝光或编造事件。外部流量和赛事状态仍需要未来适配器；核心B模型不合格时依赖已实现且明示的本地备用内容，而不是未实现功能。',
+  '复跑：npm test；npm run check；npm run demo；npm run demo:commercial。真实API用npm run demo:commercial -- --live。各次独立数据目录默认三位买方各100分，不影响日常账户。',
+];
+await writeFile('docs/COMMERCIAL-UPGRADE.md', sections.join('\n\n') + '\n');
+console.log('docs/COMMERCIAL-UPGRADE.md generated from actual saved outputs.');

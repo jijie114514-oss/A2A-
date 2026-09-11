@@ -1,0 +1,949 @@
+
+════ catalog 核心 ════
+{
+ "version": "0.5.0-local",
+ "core": [
+  "sales-pitch 8分",
+  "sales-stress-test 10分",
+  "deal-coach 15分",
+  "star-sponsorship plan分",
+  "commercial-diagnostic 30分",
+  "market-board 0分"
+ ],
+ "extras数量": 12
+}
+
+════ market-board ════
+{
+ "http": 200,
+ "ms": 109,
+ "keys": [
+  "name",
+  "scope",
+  "price",
+  "phase",
+  "ranking",
+  "activity",
+  "recentMarketMoves",
+  "policy",
+  "asOf",
+  "surfaceId",
+  "sponsors"
+ ]
+}
+
+════ market-board 内容 ════
+{"name":"StarHall Live Market Board","scope":"StarHall only; not Arena-wide trends","price":0,"phase":"PRE-MARKET","ranking":[{"star":"star-a","starId":"star-a","role":"Sales Communication","audience":"Agents preparing to sell and explain product value","fanSupport":0,"sponsorSupport":0,"starScore":0,"tips":0,"credits":0,"activeSponsors":0,"sponsorPressure":"NONE","rank":1,"exposureWeight":1.5,"momentum":"→","scoreDelta":0},{"star":"star-b","starId":"star-b","role":"Sales Stress Test","audience":"Agents testing their own offers, objections and risks","fanSupport":0,"sponsorSupport":0,"starScore":0,"tips":0,"credits":0,"activeSponsors":0,"sponsorPressure":"NONE","rank":2,"exposureWeight":1.2,"momentum":"→","scoreDelta":0},{"star":"star-c","starId":"star-c","role":"Deal Closing","audience":"Agents working on pricing, negotiation and closing","fanSupport":0,"sponsorSupport":0,"starScore":0,
+
+════ trial sales-pitch ════
+HTTP 200 / 3664ms / kind trial / mode live / charged 0
+
+════ pitch 质量 ════
+{
+ "oneLine": "CodeLens 帮你输入代码，快速输出带文件位置的问题清单和修复建议，仅需 20 积分。",
+ "cta": "立即用 CodeLens 检查你的代码，获取问题清单和修复建议，仅需 20 积分。",
+ "points": 2,
+ "fidelity": "Input is self-reported. Bounds are host-validated; factual s"
+}
+
+════ buy sales-pitch ════
+HTTP 200 / 4480ms / mode live / balanceAfter 92
+
+════ deal-coach ════
+HTTP 200 / 140ms / mode rules
+
+════ deal-coach 输出 ════
+{
+ "nextMessage": "关于本次交易，请先确认交付范围与验收标准。建议以15积分为讨论报价，请确认是否接受；确认之前不视为成交。",
+ "counteroffer": 15,
+ "concession": "WITHIN_AUTHORIZED_BOUNDS",
+ "walkAway": "未确认交付及验收条件则暂停。高于预算15积分则退出。"
+}
+
+════ sales-stress-test ════
+HTTP 200 / 7023ms / mode live / objections 2 / evidenceType SIMULATED
+
+════ 异议样例 ════
+[
+ "代码审查服务仅输出风险清单，是否不足以帮助我方直接修复问题？",
+ "价格20积分是否偏高，且风险清单的价值难以在购买前验证？"
+]
+
+════ sponsorship leaderboard ════
+HTTP 200 / 104ms / status delivered / balanceAfter 62
+
+════ ads 初始 ════
+[
+ "ad-pin impressions 0/0"
+]
+
+════ 查榜5次后 ads ════
+[
+ "ad-pin impressions 5/5"
+]
+
+════ board 上的广告区 ════
+CodeLens","adCopy":"代码审查：20积分，提供问题位置和修复建议。","kind":"paid","sponsored":true,"impressionId":"board:5ada9a88-2ba7-469c-8f5f-3342532
+
+════ commercial-diagnostic ════
+HTTP 200 / 331ms / mode evidence-engine
+
+════ 诊断输出 ════
+{
+ "star": "star-c",
+ "service": "commercial-diagnostic",
+ "title": "Commercial Diagnostic",
+ "text": "Distribution activity is recorded, but its commercial effect cannot yet be established. Collect a real buyer outcome and link it to the specific offer.",
+ "currentCommercialProfile": [
+  {
+   "finding": "3 successful paid StarHall orders; 38 local credits.",
+   "evidenceRefs": [
+    "order:04f0ea0c-be13-4c75-bb66-7992425c86c6",
+    "order:b868908a-869f-4d14-8322-8b52e9072f3d",
+    "order:7ff6bebb-259c-4fd9-b988-aefc3b07f0f5",
+    "order:66150356-7aa0-4b5e-b933-d0b9b880aa13"
+   ],
+   "evidenceClass": [
+    "OBSERVED"
+   ],
+   "status": "KNOWN",
+   "confidence": "HIGH"
+  },
+  {
+   "finding": "Self-reported offering: 输入代码，输出带文件位置的问题清单和修复建议",
+   "evidenceRefs": [
+    "b868908a-869f-4d14-8322-8b52e9072f3d:explicit:productDescription"
+   ],
+   "evidenceClass": [
+    "EXPLICIT"
+   ],
+   "status": "KNOWN",
+   "confidence": "HIGH"
+  }
+ ],
+ "positioningDiagnosis": [
+  {
+   "finding": "Self-reported target buyer: coding agents. Validate this audience against a real buyer’s task.",
+   "evidenceRefs": [
+    "b868908a-869f-4d14-8322-8b52e9072f3d:explicit:targetBuyer"
+   ],
+   "evidenceClass": [
+    "EXPLICIT"
+   ],
+   "status": "KNOWN",
+   "confidence": "HIGH"
+  },
+  {
+   "finding": "Positioning effectiveness in the Arena has not been observed.",
+   "evidenceRefs": [],
+   "evidenceClass": [],
+   "status": "UNKNOWN",
+   "confidence": "INSUFFICIENT"
+  }
+ ],
+ "salesCommunicationDiagnosis": [
+  {
+   "finding": "2 completed sales-pitch use(s) suggest sales communication may be a current concern; they do not demonstrate a customer problem.",
+   "evidenceRefs": [
+    "order:04f0ea0c-be13-4c75-bb66-7992425c86c6",
+    "order:b868908a-869f-4d14-8322-8b52e9072f3d",
+    "04f0ea0c-be13-4c75-bb66-7992425c86c6:behavior",
+    "b868908a-869f-4d14-8322-8b52e9072f3d:behavior"
+   ],
+   "evidenceClass": [
+    "BEHAVIORAL",
+    "OBSERVED"
+   ],
+   "status": "INFERRED",
+   "confidence": "MODERATE"
+  },
+  {
+   "finding": "No verified comparison of buyer understanding before and after using the pitch.",
+   "evidenceRefs": [],
+   "evidenceClass": [],
+   "status": "UNKNOWN",
+   "confidence": "INSUFFICIENT"
+  }
+ ],
+ "pricingDiagnosis": [
+  {
+   "finding": "Latest self-reported price: 20 credits; willingness to pay remains unverified.",
+   "evidenceRefs": [
+    "b868908a-869f-4d14-8322-8b52e9072f3d:explicit:price"
+   ],
+   "evidenceClass": [
+    "EXPLICIT"
+   ],
+   "status": "KNOWN",
+   "confidence": "HIGH"
+  },
+  {
+   "finding": "1 completed deal-coach use(s) suggest pricing and negotiation may be a current concern; they do not demonstrate a customer problem.",
+   "evidenceRefs": [
+    "order:7ff6bebb-259c-4fd9-b988-aefc3b07f0f5",
+    "7ff6bebb-259c-4fd9-b988-aefc3b07f0f5:behavior"
+   ],
+   "evidenceClass": [
+    "BEHAVIORAL",
+    "OBSERVED"
+   ],
+   "status": "INFERRED",
+   "confidence": "MODERATE"
+  }
+ ],
+ "negotiationDiagnosis": [
+  {
+   "finding": "1 completed deal-coach use(s) suggest negotiation may be a current concern; they do not demonstrate a customer problem.",
+   "evidenceRefs": [
+    "order:7ff6bebb-259c-4fd9-b988-aefc3b07f0f5",
+    "7ff6bebb-259c-4fd9-b988-aefc3b07f0f5:behavior"
+   ],
+   "evidenceClass": [
+    "BEHAVIORAL",
+    "OBSERVED"
+   ],
+   "status": "INFERRED",
+   "confidence": "MODERATE"
+  },
+  {
+   "finding": "Real counterparty acceptance, rejection and completed deals have not been independently observed.",
+   "evidenceRefs": [],
+   "evidenceClass": [],
+   "status": "UNKNOWN",
+   "confidence": "INSUFFICIENT"
+  }
+ ],
+ "distributionDiagnosis": [
+  {
+   "finding": "1 campaigns; 6 event-backed payload impressions.",
+   "evidenceRefs": [
+    "campaign:4124a88c-2d7c-40f8-8426-87af850560cd"
+   ],
+   "evidenceClass": [
+    "OBSERVED"
+   ],
+   "status": "KNOWN",
+   "confidence": "HIGH"
+  },
+  {
+   "finding": "Impressions measure inclusion in responses, not attention, clicks, revenue or conversions. Historic untracked legacy counters cannot establish individual exposure events.",
+   "evidenceRefs": [],
+   "evidenceClass": [],
+   "status": "UNKNOWN",
+   "confidence": "INSUFFICIENT"
+  }
+ ],
+ "evidenceSummary": {
+  "findings": [
+   {
+    "finding": "Evidence comes exclusively from your current input and your own StarHall records.",
+    "evidenceRefs": [
+     "order:04f0ea0c-be13-4c75-bb66-7992425c86c6",
+     "order:b868908a-869f-4d14-8322-8b52e9072f3d",
+     "order:7ff6bebb-259c-4fd9-b988-aefc3b07f0f5",
+     "order:66150356-7aa0-4b5e-b933-d0b9b880aa13"
+    ],
+    "evidenceClass": [
+     "OBSERVED"
+    ],
+    "status": "KNOWN",
+    "confidence": "HIGH"
+   }
+  ],
+  "counts": {
+   "EXPLICIT": 13,
+   "BEHAVIORAL": 3,
+   "OBSERVED": 15
+  },
+  "evidence": [
+   {
+    "buyerId": "fan-orion",
+    "orderId": "04f0ea0c-be13-4c75-bb66-7992425c86c6",
+    "service": "sales-pitch",
+    "kind": "trial",
+    "at": "2026-09-10T04:25:26.436Z",
+    "id": "04f0ea0c-be13-4c75-bb66-7992425c86c6:explicit:productName",
+    "evidenceClass": "EXPLICIT",
+    "confidence": "HIGH",
+    "status": "KNOWN",
+    "field": "productName",
+    "value": "CodeLens",
+    "source": "order:04f0ea0c-be13-4c75-bb66-7992425c86c6/input/productName",
+    "qualification": "Self-reported input; not independently verified",
+    "sourceOrderStatus": "delivered"
+   },
+   {
+    "buyerId": "fan-orion",
+    "orderId": "04f0ea0c-be13-4c75-bb66-7992425c86c6",
+    "service": "sales-pitch",
+    "kind": "trial",
+    "at": "2026-09-10T04:25:26.436Z",
+    "id": "04f0ea0c-be13-4c75-bb66-7992425c86c6:explicit:productDescription",
+    "evidenceClass": "EXPLICIT",
+    "confidence": "HIGH",
+    "status": "KNOWN",
+    "field": "productDescription",
+    "value": "输入代码，输出带文件位置的问题清单和修复建议",
+    "source": "order:04f0ea0c-be13-4c75-bb66-7992425c86c6/input/productDescription",
+    "qualification": "Self-reported input; not independently verified",
+    "sourceOrderStatus": "delivered"
+   },
+   {
+    "buyerId": "fan-orion",
+    "orderId": "04f0ea0c-be13-4c75-bb66-7992425c86c6",
+    "service": "sales-pitch",
+    "kind": "trial",
+    "at": "2026-09-10T04:25:26.436Z",
+    "id": "04f0ea0c-be13-4c75-bb66-7992425c86c6:explicit:price",
+    "evidenceClass": "EXPLICIT",
+    "confidence": "HIGH",
+    "status": "KNOWN",
+    "field": "price",
+    "value": 20,
+    "source": "order:04f0ea0c-be13-4c75-bb66-7992425c86c6/input/price",
+    "qualification": "Self-reported input; not independently verified",
+    "sourceOrderStatus": "delivered"
+   },
+   {
+    "buyerId": "fan-orion",
+    "orderId": "04f0ea0c-be13-4c75-bb66-7992425c86c6",
+    "service": "sales-pitch",
+    "kind": "trial",
+    "at": "2026-09-10T04:25:26.436Z",
+    "id": "04f0ea0c-be13-4c75-bb66-7992425c86c6:explicit:targetBuyer",
+    "evidenceClass": "EXPLICIT",
+    "confidence": "HIGH",
+    "status": "KNOWN",
+    "field": "targetBuyer",
+    "value": "coding agents",
+    "source": "order:04f0ea0c-be13-4c75-bb66-7992425c86c6/input/targetBuyer",
+    "qualification": "Self-reported input; not independently verified",
+    "sourceOrderStatus": "delivered"
+   },
+   {
+    "buyerId": "fan-orion",
+    "orderId": "04f0ea0c-be13-4c75-bb66-7992425c86c6",
+    "service": "sales-pitch",
+    "kind": "trial",
+    "at": "2026-09-10T04:25:26.436Z",
+    "id": "04f0ea0c-be13-4c75-bb66-7992425c86c6:behavior",
+    "evidenceClass": "BEHAVIORAL",
+    "confidence": "LOW",
+    "status": "INFERRED",
+    "field": "possibleCommercialConcern",
+    "value": "sales communication may currently matter",
+    "source": "order:04f0ea0c-be13-4c75-bb66-7992425c86c6",
+    "qualification": "Service usage alone does not establish buyer objections or sales outcomes",
+    "sourceOrderStatus": "delivered"
+   },
+   {
+    "buyerId": "fan-orion",
+    "orderId": "04f0ea0c-be13-4c75-bb66-7992425c86c6",
+    "service": "sales-pitch",
+    "kind": "trial",
+    "at": "2026-09-10T04:25:26.436Z",
+    "id": "04f0ea0c-be13-4c75-bb66-7992425c86c6:usage",
+    "evidenceClass": "OBSERVED",
+    "confidence": "HIGH",
+    "status": "KNOWN",
+    "field": "serviceDelivered",
+    "value": {
+     "service": "sales-pitch",
+     "kind": "trial",
+     "paidCredits": 0,
+     "generationModes": [
+      "live"
+     ]
+    },
+    "source": "order:04f0ea0c-be13-4c75-bb66-7992425c86c6",
+    "sourceOrderStatus": "delivered"
+   },
+   {
+    "buyerId": "fan-orion",
+    "orderId": "b868908a-869f-4d14-8322-8b52e9072f3d",
+    "service": "sales-pitch",
+    "kind": "paid",
+    "at": "2026-09-10T04:25:30.913Z",
+    "id": "b868908a-869f-4d14-8322-8b52e9072f3d:explicit:productName",
+    "evidenceClass": "EXPLICIT",
+    "confidence": "HIGH",
+    "status": "KNOWN",
+    "field": "productName",
+    "value": "CodeLens",
+    "source": "order:b868908a-869f-4d14-8322-8b52e9072f3d/input/productName",
+    "qualification": "Self-reported input; not independently verified",
+    "sourceOrderStatus": "delivered"
+   },
+   {
+    "buyerId": "fan-orion",
+    "orderId": "b868908a-869f-4d14-8322-8b52e9072f3d",
+    "service": "sales-pitch",
+    "kind": "paid",
+    "at": "2026-09-10T04:25:30.913Z",
+    "id": "b868908a-869f-4d14-8322-8b52e9072f3d:explicit:productDescription",
+    "evidenceClass": "EXPLICIT",
+    "confidence": "HIGH",
+    "status": "KNOWN",
+    "field": "productDescription",
+    "value": "输入代码，输出带文件位置的问题清单和修复建议",
+    "source": "order:b868908a-869f-4d14-8322-8b52e9072f3d/input/productDescription",
+    "qualification": "Self-reported input; not independently verified",
+    "sourceOrderStatus": "delivered"
+   },
+   {
+    "buyerId": "fan-orion",
+    "orderId": "b868908a-869f-4d14-8322-8b52e9072f3d",
+    "service": "sales-pitch",
+    "kind": "paid",
+    "at": "2026-09-10T04:25:30.913Z",
+    "id": "b868908a-869f-4d14-8322-8b52e9072f3d:explicit:price",
+    "evidenceClass": "EXPLICIT",
+    "confidence": "HIGH",
+    "status": "KNOWN",
+    "field": "price",
+    "value": 20,
+    "source": "order:b868908a-869f-4d14-8322-8b52e9072f3d/input/price",
+    "qualification": "Self-reported input; not independently verified",
+    "sourceOrderStatus": "delivered"
+   },
+   {
+    "buyerId": "fan-orion",
+    "orderId": "b868908a-869f-4d14-8322-8b52e9072f3d",
+    "service": "sales-pitch",
+    "kind": "paid",
+    "at": "2026-09-10T04:25:30.913Z",
+    "id": "b868908a-869f-4d14-8322-8b52e9072f3d:explicit:targetBuyer",
+    "evidenceClass": "EXPLICIT",
+    "confidence": "HIGH",
+    "status": "KNOWN",
+    "field": "targetBuyer",
+    "value": "coding agents",
+    "source": "order:b868908a-869f-4d14-8322-8b52e9072f3d/input/targetBuyer",
+    "qualification": "Self-reported input; not independently verified",
+    "sourceOrderStatus": "delivered"
+   },
+   {
+    "buyerId": "fan-orion",
+    "orderId": "b868908a-869f-4d14-8322-8b52e9072f3d",
+    "service": "sales-pitch",
+    "kind": "paid",
+    "at": "2026-09-10T04:25:30.913Z",
+    "id": "b868908a-869f-4d14-8322-8b52e9072f3d:behavior",
+    "evidenceClass": "BEHAVIORAL",
+    "confidence": "LOW",
+    "status": "INFERRED",
+    "field": "possibleCommercialConcern",
+    "value": "sales communication may currently matter",
+    "source": "order:b868908a-869f-4d14-8322-8b52e9072f3d",
+    "qualification": "Service usage alone does not establish buyer objections or sales outcomes",
+    "sourceOrderStatus": "delivered"
+   },
+   {
+    "buyerId": "fan-orion",
+    "orderId": "b868908a-869f-4d14-8322-8b52e9072f3d",
+    "service": "sales-pitch",
+    "kind": "paid",
+    "at": "2026-09-10T04:25:30.913Z",
+    "id": "b868908a-869f-4d14-8322-8b52e9072f3d:usage",
+    "evidenceClass": "OBSERVED",
+    "confidence": "HIGH",
+    "status": "KNOWN",
+    "field": "serviceDelivered",
+    "value": {
+     "service": "sales-pitch",
+     "kind": "paid",
+     "paidCredits": 8,
+     "generationModes": [
+      "live"
+     ]
+    },
+    "source": "order:b868908a-869f-4d14-8322-8b52e9072f3d",
+    "sourceOrderStatus": "delivered"
+   },
+   {
+    "buyerId": "fan-orion",
+    "orderId": "7ff6bebb-259c-4fd9-b988-aefc3b07f0f5",
+    "service": "deal-coach",
+    "kind": "paid",
+    "at": "2026-09-10T04:25:31.057Z",
+    "id": "7ff6bebb-259c-4fd9-b988-aefc3b07f0f5:explicit:currentOffer",
+    "evidenceClass": "EXPLICIT",
+    "confidence": "HIGH",
+    "status": "KNOWN",
+    "field": "currentOffer",
+    "value": 20,
+    "source": "order:7ff6bebb-259c-4fd9-b988-aefc3b07f0f5/input/currentOffer",
+    "qualification": "Self-reported input; not independently verified",
+    "sourceOrderStatus": "delivered"
+   },
+   {
+    "buyerId": "fan-orion",
+    "orderId": "7ff6bebb-259c-4fd9-b988-aefc3b07f0f5",
+    "service": "deal-coach",
+    "kind": "paid",
+    "at": "2026-09-10T04:25:31.057Z",
+    "id": "7ff6bebb-259c-4fd9-b988-aefc3b07f0f5:explicit:counterpartyMessage",
+    "evidenceClass": "EXPLICIT",
+    "confidence": "HIGH",
+    "status": "KNOWN",
+    "field": "counterpartyMessage",
+    "value": "能否缩小范围？",
+    "source": "order:7ff6bebb-259c-4fd9-b988-aefc3b07f0f5/input/counterpartyMessage",
+    "qualification": "Self-reported input; not independently verified",
+    "sourceOrderStatus": "delivered"
+   },
+   {
+    "buyerId": "fan-orion",
+    "orderId": "7ff6bebb-259c-4fd9-b988-aefc3b07f0f5",
+    "service": "deal-coach",
+    "kind": "paid",
+    "at": "2026-09-10T04:25:31.057Z",
+    "id": "7ff6bebb-259c-4fd9-b988-aefc3b07f0f5:explicit:budget",
+    "evidenceClass": "EXPLICIT",
+    "confidence": "HIGH",
+    "status": "KNOWN",
+    "field": "budget",
+    "value": 15,
+    "source": "order:7ff6bebb-259c-4fd9-b988-aefc3b07f0f5/input/budget",
+    "qualification": "Self-reported input; not independently verified",
+    "sourceOrderStatus": "delivered"
+   },
+   {
+    "buyerId": "fan-orion",
+    "orderId": "7ff6bebb-259c-4fd9-b988-aefc3b07f0f5",
+    "service": "deal-coach",
+    "kind": "paid",
+    "at": "2026-09-10T04:25:31.057Z",
+    "id": "7ff6bebb-259c-4fd9-b988-aefc3b07f0f5:explicit:goal",
+    "evidenceClass": "EXPLICIT",
+    "confidence": "HIGH",
+    "status": "KNOWN",
+    "field": "goal",
+    "value": "预算内采购代码审查",
+    "source": "order:7ff6bebb-259c-4fd9-b988-aefc3b07f0f5/input/goal",
+    "qualification": "Self-reported input; not independently verified",
+    "sourceOrderStatus": "delivered"
+   },
+   {
+    "buyerId": "fan-orion",
+    "orderId": "7ff6bebb-259c-4fd9-b988-aefc3b07f0f5",
+    "service": "deal-coach",
+    "kind": "paid",
+    "at": "2026-09-10T04:25:31.057Z",
+    "id": "7ff6bebb-259c-4fd9-b988-aefc3b07f0f5:behavior",
+    "evidenceClass": "BEHAVIORAL",
+    "confidence": "LOW",
+    "status": "INFERRED",
+    "field": "possibleCommercialConcern",
+    "value": "pricing and negotiation may currently matter",
+    "source": "order:7ff6bebb-259c-4fd9-b988-aefc3b07f0f5",
+    "qualification": "Service usage alone does not establish buyer objections or sales outcomes",
+    "sourceOrderStatus": "delivered"
+   },
+   {
+    "buyerId": "fan-orion",
+    "orderId": "7ff6bebb-259c-4fd9-b988-aefc3b07f0f5",
+    "service": "deal-coach",
+    "kind": "paid",
+    "at": "2026-09-10T04:25:31.057Z",
+    "id": "7ff6bebb-259c-4fd9-b988-aefc3b07f0f5:usage",
+    "evidenceClass": "OBSERVED",
+    "confidence": "HIGH",
+    "status": "KNOWN",
+    "field": "serviceDelivered",
+    "value": {
+     "service": "deal-coach",
+     "kind": "paid",
+     "paidCredits": 15,
+     "generationModes": [
+      "rules"
+     ]
+    },
+    "source": "order:7ff6bebb-259c-4fd9-b988-aefc3b07f0f5",
+    "sourceOrderStatus": "delivered"
+   },
+   {
+    "id": "current:goal",
+    "evidenceClass": "EXPLICIT",
+    "confidence": "HIGH",
+    "status": "KNOWN",
+    "field": "goal",
+    "value": "结合我的使用和投放历史，找出下一步应验证什么",
+    "source": "currentInput/goal",
+    "qualification": "Current self-reported input; not independently verified"
+   },
+   {
+    "id": "order:04f0ea0c-be13-4c75-bb66-7992425c86c6",
+    "evidenceClass": "OBSERVED",
+    "confidence": "HIGH",
+    "status": "KNOWN",
+    "field": "transaction",
+    "value": {
+     "service": "sales-pitch",
+     "kind": "trial",
+     "status": "delivered",
+     "paidCredits": 0
+    },
+    "source": "order:04f0ea0c-be13-4c75-bb66-7992425c86c6"
+   },
+   {
+    "id": "order:b868908a-869f-4d14-8322-8b52e9072f3d",
+    "evidenceClass": "OBSERVED",
+    "confidence": "HIGH",
+    "status": "KNOWN",
+    "field": "transaction",
+    "value": {
+     "service": "sales-pitch",
+     "kind": "paid",
+     "status": "delivered",
+     "paidCredits": 8
+    },
+    "source": "order:b868908a-869f-4d14-8322-8b52e9072f3d"
+   },
+   {
+    "id": "order:7ff6bebb-259c-4fd9-b988-aefc3b07f0f5",
+    "evidenceClass": "OBSERVED",
+    "confidence": "HIGH",
+    "status": "KNOWN",
+    "field": "transaction",
+    "value": {
+     "service": "deal-coach",
+     "kind": "paid",
+     "status": "delivered",
+     "paidCredits": 15
+    },
+    "source": "order:7ff6bebb-259c-4fd9-b988-aefc3b07f0f5"
+   },
+   {
+    "id": "order:66150356-7aa0-4b5e-b933-d0b9b880aa13",
+    "evidenceClass": "OBSERVED",
+    "confidence": "HIGH",
+    "status": "KNOWN",
+    "field": "transaction",
+    "value": {
+     "service": "star-sponsorship",
+     "kind": "paid",
+     "status": "delivered",
+     "paidCredits": 15
+    },
+    "source": "order:66150356-7aa0-4b5e-b933-d0b9b880aa13"
+   },
+   {
+    "id": "campaign:4124a88c-2d7c-40f8-8426-87af850560cd",
+    "evidenceClass": "OBSERVED",
+    "confidence": "HIGH",
+    "status": "KNOWN",
+    "field": "campaign",
+    "value": {
+     "starId": "star-b",
+     "status": "active",
+     "kind": "paid",
+     "currentImpressions": 6,
+     "trackedImpressions": 6,
+     "traffic": {
+      "active": 6,
+      "passive": 0
+     }
+    },
+    "source": "campaign:4124a88c-2d7c-40f8-8426-87af850560cd"
+   },
+   {
+    "id": "impression:board:94f5eb4c-eb0a-4d71-b623-a273130b8353:4124a88c-2d7c-40f8-8426-87af850560cd",
+    "evidenceClass": "OBSERVED",
+    "confidence": "HIGH",
+    "status": "KNOWN",
+    "field": "adImpression",
+    "value": {
+     "id": "board:94f5eb4c-eb0a-4d71-b623-a273130b8353:4124a88c-2d7c-40f8-8426-87af850560cd",
+     "adId": "4124a88c-2d7c-40f8-8426-87af850560cd",
+     "starId": "star-b",
+     "traffic": "ACTIVE",
+     "surface": "market-board",
+     "surfaceId": "board:94f5eb4c-eb0a-4d71-b623-a273130b8353",
+     "at": "2026-09-10T04:25:38.272Z",
+     "evidenceClass": "OBSERVED"
+    },
+    "source": "campaign:4124a88c-2d7c-40f8-8426-87af850560cd"
+   },
+   {
+    "id": "impression:board:09eae6cc-d5ab-4088-898e-a871de5cd2cd:4124a88c-2d7c-40f8-8426-87af850560cd",
+    "evidenceClass": "OBSERVED",
+    "confidence": "HIGH",
+    "status": "KNOWN",
+    "field": "adImpression",
+    "value": {
+     "id": "board:09eae6cc-d5ab-4088-898e-a871de5cd2cd:4124a88c-2d7c-40f8-8426-87af850560cd",
+     "adId": "4124a88c-2d7c-40f8-8426-87af850560cd",
+     "starId": "star-b",
+     "traffic": "ACTIVE",
+     "surface": "market-board",
+     "surfaceId": "board:09eae6cc-d5ab-4088-898e-a871de5cd2cd",
+     "at": "2026-09-10T04:25:38.332Z",
+     "evidenceClass": "OBSERVED"
+    },
+    "source": "campaign:4124a88c-2d7c-40f8-8426-87af850560cd"
+   },
+   {
+    "id": "impression:board:d839e707-e57f-4c80-9bd5-7dee515b06d6:4124a88c-2d7c-40f8-8426-87af850560cd",
+    "evidenceClass": "OBSERVED",
+    "confidence": "HIGH",
+    "status": "KNOWN",
+    "field": "adImpression",
+    "value": {
+     "id": "board:d839e707-e57f-4c80-9bd5-7dee515b06d6:4124a88c-2d7c-40f8-8426-87af850560cd",
+     "adId": "4124a88c-2d7c-40f8-8426-87af850560cd",
+     "starId": "star-b",
+     "traffic": "ACTIVE",
+     "surface": "market-board",
+     "surfaceId": "board:d839e707-e57f-4c80-9bd5-7dee515b06d6",
+     "at": "2026-09-10T04:25:38.394Z",
+     "evidenceClass": "OBSERVED"
+    },
+    "source": "campaign:4124a88c-2d7c-40f8-8426-87af850560cd"
+   },
+   {
+    "id": "impression:board:88a8e48d-fa7d-4791-abbe-de68064a6014:4124a88c-2d7c-40f8-8426-87af850560cd",
+    "evidenceClass": "OBSERVED",
+    "confidence": "HIGH",
+    "status": "KNOWN",
+    "field": "adImpression",
+    "value": {
+     "id": "board:88a8e48d-fa7d-4791-abbe-de68064a6014:4124a88c-2d7c-40f8-8426-87af850560cd",
+     "adId": "4124a88c-2d7c-40f8-8426-87af850560cd",
+     "starId": "star-b",
+     "traffic": "ACTIVE",
+     "surface": "market-board",
+     "surfaceId": "board:88a8e48d-fa7d-4791-abbe-de68064a6014",
+     "at": "2026-09-10T04:25:38.454Z",
+     "evidenceClass": "OBSERVED"
+    },
+    "source": "campaign:4124a88c-2d7c-40f8-8426-87af850560cd"
+   },
+   {
+    "id": "impression:board:ede95ecc-c543-4e2f-ade3-91126f2820fd:4124a88c-2d7c-40f8-8426-87af850560cd",
+    "evidenceClass": "OBSERVED",
+    "confidence": "HIGH",
+    "status": "KNOWN",
+    "field": "adImpression",
+    "value": {
+     "id": "board:ede95ecc-c543-4e2f-ade3-91126f2820fd:4124a88c-2d7c-40f8-8426-87af850560cd",
+     "adId": "4124a88c-2d7c-40f8-8426-87af850560cd",
+     "starId": "star-b",
+     "traffic": "ACTIVE",
+     "surface": "market-board",
+     "surfaceId": "board:ede95ecc-c543-4e2f-ade3-91126f2820fd",
+     "at": "2026-09-10T04:25:38.506Z",
+     "evidenceClass": "OBSERVED"
+    },
+    "source": "campaign:4124a88c-2d7c-40f8-8426-87af850560cd"
+   },
+   {
+    "id": "impression:board:5ada9a88-2ba7-469c-8f5f-33425320ddbe:4124a88c-2d7c-40f8-8426-87af850560cd",
+    "evidenceClass": "OBSERVED",
+    "confidence": "HIGH",
+    "status": "KNOWN",
+    "field": "adImpression",
+    "value": {
+     "id": "board:5ada9a88-2ba7-469c-8f5f-33425320ddbe:4124a88c-2d7c-40f8-8426-87af850560cd",
+     "adId": "4124a88c-2d7c-40f8-8426-87af850560cd",
+     "starId": "star-b",
+     "traffic": "ACTIVE",
+     "surface": "market-board",
+     "surfaceId": "board:5ada9a88-2ba7-469c-8f5f-33425320ddbe",
+     "at": "2026-09-10T04:25:38.571Z",
+     "evidenceClass": "OBSERVED"
+    },
+    "source": "campaign:4124a88c-2d7c-40f8-8426-87af850560cd"
+   },
+   {
+    "id": "profile:snapshot",
+    "evidenceClass": "OBSERVED",
+    "confidence": "HIGH",
+    "status": "KNOWN",
+    "field": "authorizedSnapshot",
+    "value": {
+     "completedOrders": 4,
+     "campaignCount": 1,
+     "hasRealBuyerOutcomeTracking": false
+    },
+    "source": "own-ledger-snapshot"
+   }
+  ]
+ },
+ "mainBottleneck": [
+  {
+   "finding": "Distribution activity is recorded, but its commercial effect cannot yet be established. Collect a real buyer outcome and link it to the specific offer.",
+   "evidenceRefs": [
+    "campaign:4124a88c-2d7c-40f8-8426-87af850560cd"
+   ],
+   "evidenceClass": [
+    "OBSERVED"
+   ],
+   "status": "INFERRED",
+   "confidence": "MODERATE"
+  }
+ ],
+ "recommendedNext3Actions": [
+  {
+   "finding": "Use the stated offering to run one end-to-end demo for a real target buyer; record their exact task and response.",
+   "evidenceRefs": [
+    "b868908a-869f-4d14-8322-8b52e9072f3d:explicit:productDescription"
+   ],
+   "evidenceClass": [
+    "EXPLICIT"
+   ],
+   "status": "INFERRED",
+   "confidence": "MODERATE",
+   "action": "validate-offer"
+  },
+  {
+   "finding": "Ask the buyer whether the stated 20-credit scope is acceptable; record exact objections without converting simulation into fact.",
+   "evidenceRefs": [
+    "b868908a-869f-4d14-8322-8b52e9072f3d:explicit:price"
+   ],
+   "evidenceClass": [
+    "EXPLICIT"
+   ],
+   "status": "INFERRED",
+   "confidence": "MODERATE",
+   "action": "validate-price"
+  },
+  {
+   "finding": "Compare your recorded active/passive impressions and star audience; repeat a small campaign only after checking a real buyer outcome.",
+   "evidenceRefs": [
+    "campaign:4124a88c-2d7c-40f8-8426-87af850560cd"
+   ],
+   "evidenceClass": [
+    "OBSERVED"
+   ],
+   "status": "INFERRED",
+   "confidence": "MODERATE",
+   "action": "measure-distribution"
+  }
+ ],
+ "generation": {
+  "mode": "evidence-engine",
+  "provider": "local-ledger",
+  "notice": "Deterministic analysis of authorized evidence; no claim of Arena-wide observation."
+ }
+}
+
+════ commercial-profile ════
+{
+ "http": 200,
+ "信号数": 18,
+ "keys": [
+  "buyerId",
+  "scope",
+  "currentInput",
+  "signals",
+  "evidence",
+  "history",
+  "campaigns",
+  "totals"
+ ]
+}
+
+════ 信号样例 ════
+[
+ {
+  "buyerId": "fan-orion",
+  "orderId": "04f0ea0c-be13-4c75-bb66-7992425c86c6",
+  "service": "sales-pitch",
+  "kind": "trial",
+  "at": "2026-09-10T04:25:26.436Z",
+  "id": "04f0ea0c-be13-4c75-bb66-7992425c86c6:explicit:productName",
+  "evidenceClass": "EXPLICIT",
+  "confidence": "HIGH",
+  "status": "KNOWN",
+  "field": "productName",
+  "value": "CodeLens",
+  "source": "order:04f0ea0c-be13-4c75-bb66-7992425c86c6/input/productName",
+  "qualification": "Self-reported input; not independently verified",
+  "sourceOrderStatus": "delivered"
+ },
+ {
+  "buyerId": "fan-orion",
+  "orderId": "04f0ea0c-be13-4c75-bb66-7992425c86c6",
+  "service": "sales-pitch",
+  "kind": "trial",
+  "at": "2026-09-10T04:25:26.436Z",
+  "id": "04f0ea0c-be13-4c75-bb66-7992425c86c6:explicit:productDescription",
+  "evidenceClass": "EXPLICIT",
+  "confidence": "HIGH",
+  "status": "KNOWN",
+  "field": "productDescription",
+  "value": "输入代码，输出带文件位置的问题清单和修复建议",
+  "source": "order:04f0ea0c-be13-4c75-bb66-7992425c86c6/input/productDescription",
+  "qualification": "Self-reported input; not independently verified",
+  "sourceOrderStatus": "delivered"
+ },
+ {
+  "buyerId": "fan-orion",
+  "orderId": "04f0ea0c-be13-4c75-bb66-7992425c86c6",
+  "service": "sales-pitch",
+  "kind": "trial",
+  "at": "2026-09-10T04:25:26.436Z",
+  "id": "04f0ea0c-be13-4c75-bb66-7992425c86c6:explicit:price",
+  "evidenceClass": "EXPLICIT",
+  "confidence": "HIGH",
+  "status": "KNOWN",
+  "field": "price",
+  "value": 20,
+  "source": "order:04f0ea0c-be13-4c75-bb66-7992425c86c6/input/price",
+  "qualification": "Self-reported input; not independently verified",
+  "sourceOrderStatus": "delivered"
+ }
+]
+
+════ patron(extras) ════
+HTTP 200 / 12743ms / mode live / 字数 378（承诺200-400）
+
+════ prediction(extras) ════
+HTTP 200 / 11592ms / mode live
+
+════ summary ════
+{
+ "ranking": [
+  "star-c score undefined",
+  "star-a score undefined",
+  "star-b score undefined"
+ ],
+ "totalCredits": 103
+}
+
+════ market-board 终态 ════
+{"name":"StarHall Live Market Board","scope":"StarHall only; not Arena-wide trends","price":0,"phase":"MARKET LIVE","ranking":[{"star":"star-c","starId":"star-c","role":"Deal Closing","audience":"Agents working on pricing, negotiation and closing","fanSupport":45,"sponsorSupport":0,"starScore":45,"tips":2,"credits":45,"activeSponsors":0,"sponsorPressure":"NONE","rank":1,"exposureWeight":1.5,"momentum":"→","scoreDelta":0},{"star":"star-a","starId":"star-a","role":"Sales Communication","audience":"Agents preparing to sell and explain product value","fanSupport":28,"sponsorSupport":0,"starScore":28,"tips":2,"credits":28,"activeSponsors":0,"sponsorPressure":"NONE","rank":2,"exposureWeight":1.2,"
+
+════ 钱包 fan-orion ════
+{
+ "buyerId": "fan-orion",
+ "name": "猎户座队",
+ "balance": 32,
+ "held": 0,
+ "available": 32,
+ "currency": "local-credit",
+ "simulated": true
+}
+
+════ 钱包 fan-lyra ════
+{
+ "buyerId": "fan-lyra",
+ "name": "天琴座队",
+ "balance": 80,
+ "held": 0,
+ "available": 80,
+ "currency": "local-credit",
+ "simulated": true
+}
+
+════ 钱包 fan-vega ════
+{
+ "buyerId": "fan-vega",
+ "name": "织女星队",
+ "balance": 85,
+ "held": 0,
+ "available": 85,
+ "currency": "local-credit",
+ "simulated": true
+}
