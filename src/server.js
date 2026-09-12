@@ -8,6 +8,7 @@ import { VERSION } from './catalog.js';
 import { createMcpServer, toolDefinitions } from './mcp.js';
 import { buildAgentCard } from './agent-card.js';
 import { indexHtml, indexJson, HTML_HEADERS } from './landing.js';
+import { evidenceOf } from './evidence.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 
 /** 开户限流：按来源地址做小时窗口。计数落在账本状态里，多实例（Vercel）下同样生效。 */
@@ -74,7 +75,7 @@ export function createHandler(app, options) {
       if (req.method === 'GET' && url.pathname === '/health') {
         const dbReady = await app.store.probe();
         return send(200, { status: app.bridge.auditFailed || app.projectionFailed || !dbReady ? 'degraded' : 'ok', product: 'StarHall', version: VERSION,
-          mode: options.mode || 'local', store: app.store.store, dataSet: app.store.dataSet ?? null, dbReady,
+          mode: options.mode || 'local', store: app.store.store, dataSet: app.store.dataSet ?? null, dbReady, round: app.catalog().round.id,
           kernel: '@aicoo/sharedos@0.1.0-alpha.5', provider: options.llm.provider, fallbackEnabled: options.llm.fallback,
           projectionsReady: !app.projectionFailed,
           mcp: { transport: 'streamable-http', path: '/mcp' }, registration: { open: Boolean(options.openRegistration), path: '/v1/agents', credits: options.registrationCredits }, publicBaseUrl: options.publicBaseUrl || null });
@@ -98,6 +99,8 @@ export function createHandler(app, options) {
           currency: 'local-credit', simulated: true, created: registered.created,
           note: registered.created ? '请保管 token：服务端只保存摘要，无法再次取回。' : '同一 handle 与 secret 再次注册会轮换 token，旧 token 立即失效。' });
       }
+      // 免费公开证据：第一轮点评的 agent 用可核验事实提异议，第二轮买家用来比较可靠性。
+      if (req.method === 'GET' && url.pathname === '/v1/evidence') return send(200, evidenceOf(app.store.read(), { services: app.catalog().services }));
       if (req.method === 'GET' && url.pathname === '/v1/summary') return send(200, await app.summary(actor || undefined));
       if (req.method === 'GET' && url.pathname === '/v1/market-board') return send(200, await app.marketBoard(actor || undefined, req.headers['idempotency-key']));
       ensure(actor, 'unauthorized', '需要 Authorization: Bearer <token>', 401);

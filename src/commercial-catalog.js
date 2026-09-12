@@ -1,4 +1,5 @@
 import { object, string, ensure } from './errors.js';
+import { DELIVERY_BUDGET_SECONDS } from './limits.js';
 
 const text = (maxLength = 2000) => ({ type: 'string', minLength: 1, maxLength });
 const amount = { type: 'number', minimum: 0, maximum: 1000000 };
@@ -11,7 +12,7 @@ export const SPONSOR_PLANS = {
 };
 const productProperties = { productName: text(160), productDescription: text(4000), price: amount, targetBuyer: text(500), context: text(4000) };
 const productSchema = { type: 'object', properties: productProperties, additionalProperties: false, anyOf: [{ required: ['productDescription'] }, { required: ['context'] }] };
-const make = (id, star, name, price, brief, inputSchema, example) => ({ id, star, name, price, brief, inputSchema, example, commercial: true, fields: [], currency: 'local-credit', maxDeliverySeconds: 120 });
+const make = (id, star, name, price, brief, inputSchema, example) => ({ id, star, name, price, brief, inputSchema, example, commercial: true, fields: [], currency: 'local-credit', maxDeliverySeconds: DELIVERY_BUDGET_SECONDS });
 export const COMMERCIAL_SERVICES = [
   make('sales-pitch', 'star-a', 'Sales Pitch', 5, 'Turn your product into a clear Agent-ready sales pitch.', productSchema,
     { productName: 'CodeLens', productDescription: '输入代码，输出带文件位置的审查报告', price: 20, targetBuyer: 'coding agents' }),

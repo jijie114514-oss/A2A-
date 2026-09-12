@@ -1,6 +1,10 @@
 import { object, string, ensure } from './errors.js';
 import { COMMERCIAL_SERVICES, validateCommercial } from './commercial-catalog.js';
 import { STAR_ROLES } from './market.js';
+import { roundContext } from './rounds.js';
+import { DELIVERY_BUDGET_SECONDS } from './limits.js';
+
+export { DELIVERY_BUDGET_SECONDS };
 
 export const STARS = {
   'star-a': { name: '星A · 词曲家', persona: '你是星辉舞台词曲家。中文表达有节奏、有具体意象，避免空泛赞美。交付能直接使用的作品，署名「星A · 词曲家」。' },
@@ -16,15 +20,15 @@ export const AD_SERVICES = [
   ad('ad-sponsor', '表演冠名', 15, 15, '接下来30分钟所有交付作品开头带“本作品由XX队冠名呈现”'),
 ];
 export const SERVICES = [
-  service('poem', 'star-a', '定制短诗 / 歌词', 5, 180, ['theme', 'recipient'], '约100字的定制短诗或歌词，含签名'),
-  service('speech', 'star-a', '产品广告词 / 胜利致辞', 8, 180, ['occasion', 'recipient'], '可直接使用的广告词或致辞；产品名可放在场合中'),
-  service('patron', 'star-a', '金主套餐', 12, 290, ['occasion', 'recipient'], '200–400字的完整表演作品，附置顶感谢'),
-  service('roast', 'star-b', '专业吐槽', 4, 120, ['description'], '约300字，犀利但不虚构事实的产品吐槽'),
-  service('review', 'star-b', '结构化产品评审', 6, 240, ['description'], '优势、具体异议、风险、改进建议和验证方法'),
-  service('prediction', 'star-b', '冠军观察 / 选品锦囊', 3, 60, [], '有材料时给出条件性预测；无材料时提供评分尺、核验问题、候选比较表与预算止损建议'),
-  service('negotiate', 'star-c', '模拟砍价对手', 8, 290, ['scenario'], '一次交付5回合买卖双方模拟对话及复盘；也可继续5次互动练习'),
-  service('tactics', 'star-c', '谈判话术锦囊', 5, 120, ['direction'], '买方或卖方可用的开场、探底、交换、收口、退出话术'),
-  service('duet', 'star-b', '吐槽 + 反击诗套餐', 8, 290, ['description', 'theme', 'recipient'], '星B点评目标产品，跨身份调用星A写反击诗；只扣一笔8分'),
+  service('poem', 'star-a', '定制短诗 / 歌词', 5, DELIVERY_BUDGET_SECONDS, ['theme', 'recipient'], '约100字的定制短诗或歌词，含签名'),
+  service('speech', 'star-a', '产品广告词 / 胜利致辞', 8, DELIVERY_BUDGET_SECONDS, ['occasion', 'recipient'], '可直接使用的广告词或致辞；产品名可放在场合中'),
+  service('patron', 'star-a', '金主套餐', 12, DELIVERY_BUDGET_SECONDS, ['occasion', 'recipient'], '200–400字的完整表演作品，附置顶感谢'),
+  service('roast', 'star-b', '专业吐槽', 4, DELIVERY_BUDGET_SECONDS, ['description'], '约300字，犀利但不虚构事实的产品吐槽'),
+  service('review', 'star-b', '结构化产品评审', 6, DELIVERY_BUDGET_SECONDS, ['description'], '优势、具体异议、风险、改进建议和验证方法'),
+  service('prediction', 'star-b', '冠军观察 / 选品锦囊', 3, DELIVERY_BUDGET_SECONDS, [], '有材料时给出条件性预测；无材料时提供评分尺、核验问题、候选比较表与预算止损建议'),
+  service('negotiate', 'star-c', '模拟砍价对手', 8, DELIVERY_BUDGET_SECONDS, ['scenario'], '一次交付5回合买卖双方模拟对话及复盘；也可继续5次互动练习'),
+  service('tactics', 'star-c', '谈判话术锦囊', 5, DELIVERY_BUDGET_SECONDS, ['direction'], '买方或卖方可用的开场、探底、交换、收口、退出话术'),
+  service('duet', 'star-b', '吐槽 + 反击诗套餐', 8, DELIVERY_BUDGET_SECONDS, ['description', 'theme', 'recipient'], '星B点评目标产品，跨身份调用星A写反击诗；只扣一笔8分'),
   ...AD_SERVICES,
   ...COMMERCIAL_SERVICES,
 ];
@@ -54,6 +58,7 @@ function legacyCatalog(mode = 'local') {
       call: { method: 'POST', path: '/v1/orders', purpose: 'market-tip', body: s.ad ? { service: s.id, input: { text: '<广告词>' } }
         : { service: s.id, input: s.id === 'tactics' ? { direction: 'buy', context: '向别队购买代码审查服务，预算15积分，对方报价20积分，可减少一次修订。' } : Object.fromEntries(s.fields.map(f => [f, `<${f}>`])) } } }))],
     trial: { method: 'POST', path: '/v1/trials', price: 0, requires: ['customer Bearer token', 'Idempotency-Key'], limit: '每个身份每种付费服务最多一次成功免费试用；失败可换键重试。试用不产生付费会员权益。' },
+    delivery: { hardTimeoutSeconds: DELIVERY_BUDGET_SECONDS, onTimeout: 'FAILED_NO_CHARGE', retry: '用新的 Idempotency-Key 重试；原单可用幂等键查回', note: '与赛事 5 分钟交付上限保持充足余量；广告位 15 秒内生效。' },
     free: { name: '人气榜基础版', price: 0, method: 'GET', path: '/v1/summary' },
     included: ['公开点名上墙', '完整打赏墙快照', '明星粉丝记忆'],
   };
@@ -61,7 +66,7 @@ function legacyCatalog(mode = 'local') {
 export function catalog(mode = 'local') {
   const legacy = legacyCatalog(mode);
   const free = { ...legacy.services[0], id: 'market-board', name: 'StarHall Live Market Board', brief: '免费查看本队真实商业行情、明星支持与赞助压力。', call: { method: 'GET', path: '/v1/market-board', purpose: 'market-board-read' } };
-  return { ...legacy, product: 'STARHALL — SELL BETTER IN THE ARENA', positioning: 'Three commercial stars, real local usage, sponsorship and evidence-based commercial analysis.',
+  return { ...legacy, round: roundContext(), product: 'STARHALL — SELL BETTER IN THE ARENA', positioning: 'Three commercial stars, real local usage, sponsorship and evidence-based commercial analysis.',
     stars: Object.entries(STAR_ROLES).map(([starId, role]) => ({ starId, ...role })),
     services: [...COMMERCIAL_SERVICES.map(s => ({ ...s, call: { method: 'POST', path: '/v1/orders', purpose: 'market-tip', body: { service: s.id, input: s.example } } })), free],
     extras: { name: 'CELEBRITY EXTRAS', services: legacy.services.slice(1), note: 'Legacy unbound ads remain callable but are not the primary sponsorship model and do not create Sponsor Support.' },

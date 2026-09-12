@@ -3,6 +3,7 @@ import { createStore, hash, now, summaryOf, ORDER_LEASE_MS } from './store/index
 import { Brain } from './brain.js';
 import { LocalKernel } from './kernel.js';
 import { STARS, SERVICES, getService, validateInput, catalog } from './catalog.js';
+import { DELIVERY_BUDGET_SECONDS } from './limits.js';
 import { ensure, string, object, AppError } from './errors.js';
 import { SPONSOR_PLANS } from './commercial-catalog.js';
 import { marketBoard, recordMarketMove, recordRefundMove, compactBoard, boardResponse, campaignStats, activeAd, recordLegacyImpression, eligiblePaid } from './market.js';
@@ -375,7 +376,7 @@ export class StarHall {
   }
   async executeOrder(actor, order) {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 115000);
+    const timer = setTimeout(() => controller.abort(), DELIVERY_BUDGET_SECONDS * 1000);
     try {
       const result = await this.bridge.call(actor.id, 'market-tip', `service_${order.service}`, { orderId: order.id }, order.traceId, controller.signal);
       await this.store.projections().then(() => { this.projectionFailed = false; }, () => { this.projectionFailed = true; });
@@ -469,7 +470,7 @@ export class StarHall {
     const input = { ...order.input };
     if (note) input.context = [order.input.context, `修订要求：${note}`].filter(Boolean).join('\n').slice(0, 4000);
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 115000);
+    const timer = setTimeout(() => controller.abort(), DELIVERY_BUDGET_SECONDS * 1000);
     try {
       const pieces = s.id === 'commercial-diagnostic'
         ? [{ star: 'star-c', service: 'commercial-diagnostic', ...diagnostic(commercialProfile(this.store.read(), order.buyerId, input)),

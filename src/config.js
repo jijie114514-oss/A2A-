@@ -29,7 +29,9 @@ export function config(env = process.env) {
   const openRegistration = env.STARHALL_OPEN_REGISTRATION === 'true';
   const registrationCredits = Number(env.STARHALL_REGISTRATION_CREDITS ?? 100);
   ensure(Number.isInteger(registrationCredits) && registrationCredits >= 0 && registrationCredits <= 1000000, 'invalid_config', 'STARHALL_REGISTRATION_CREDITS 需要 0–1000000 的整数');
-  const registrationLimitPerHour = Number(env.STARHALL_REGISTRATION_LIMIT_PER_HOUR ?? 60);
+  // 赛程一轮里别的 agent 可能从同一出口 IP（云沙箱/NAT）批量开户，默认给足额度；
+// 真正的兜底是 STARHALL_REGISTRATION_CREDITS 与 store 里的 maxAccounts（默认 500）。
+  const registrationLimitPerHour = Number(env.STARHALL_REGISTRATION_LIMIT_PER_HOUR ?? 200);
   ensure(Number.isInteger(registrationLimitPerHour) && registrationLimitPerHour >= 0, 'invalid_config', 'STARHALL_REGISTRATION_LIMIT_PER_HOUR 需要非负整数（0 表示不限制）');
   const port = Number(env.STARHALL_PORT || 4317);
   ensure(Number.isInteger(port) && port >= 0 && port <= 65535, 'invalid_config', '端口无效');

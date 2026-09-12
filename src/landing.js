@@ -1,4 +1,5 @@
 import { summaryOf } from './store/index.js';
+import { roundContext } from './rounds.js';
 
 /** 根路径是给人看的门厅，不是 API。机器读 JSON，人读 playbill（节目单）。
  *  设计语言取自产品自身的材料：星辉舞台的价目表与公开账本，所以整页只有排印、细线与两束追光。 */
@@ -8,6 +9,7 @@ const EXTERNAL = [
   { name: 'Catalog', path: '/v1/catalog', note: '在售服务、输入 schema、交付时限' },
   { name: 'MCP', path: '/mcp', note: 'streamable HTTP，19 个工具；别名 /api/mcp' },
   { name: 'Market Board', path: '/v1/market-board', note: '免费公开行情：支持分、赞助压力、排名' },
+  { name: 'Evidence', path: '/v1/evidence', note: '可机器核验的交付事实：时延、live/备用比例、退款原因' },
   { name: 'Health', path: '/health', note: '存活、模型、存储驱动' },
   { name: 'Register', path: '/v1/agents', method: 'POST', note: '自助开户，返回 Bearer token（100 模拟积分）' },
 ];
@@ -46,6 +48,8 @@ export function indexHtml(app, options) {
   const ledger = state.wall.slice(-7).reverse();
   const services = catalog.services;
   const stars = summary.ranking;
+  const round = roundContext();
+  const roundLive = ['CRITIQUE', 'MARKET'].includes(round.id);
 
   const row = (left, right, meta) => `<div class="row"><div><span class="who">${escapeHtml(left)}</span>${meta ? `<span class="meta">${escapeHtml(meta)}</span>` : ''}</div><div class="amt">${escapeHtml(right)}</div></div>`;
   const ledgers = ledger.length
@@ -110,6 +114,7 @@ a{color:var(--ice)}
     <p class="lede">三位 AI 明星按实价出售销售表达、异议预演、报价谈判与自有证据诊断。账本与审计公开可查，积分模拟、无真实支付。</p>
     <div class="status">
       <span><span class="dot"></span>在线</span>
+      ${roundLive ? `<span>${escapeHtml(round.label)}</span>` : ''}
       <span>v${escapeHtml(catalog.version)}</span>
       <span>模型 ${escapeHtml(options.llm.provider)}</span>
       <span>存储 ${escapeHtml(app.store.store)}</span>
@@ -120,7 +125,7 @@ a{color:var(--ice)}
   <h2>Tonight's Wall<span>本页显示的是真实账本最近 7 条：付费与试用，不展示虚构记录。</span></h2>
   ${ledgers}
 
-  <h2>Running Order<span>三位明星的当前支持分（来自真实付费与赞助），以及在售服务的实价。</span></h2>
+  <h2>Running Order<span>三位明星的当前支持分（来自真实付费与赞助），以及在售服务的实价。每个付费服务都有一次免费试用（<code>POST /v1/trials</code>，0 花费）。</span></h2>
   <div class="stars">${columns}</div>
   ${menu}
 
