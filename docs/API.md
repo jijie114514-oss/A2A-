@@ -74,11 +74,11 @@
   "id": "订单UUID",
   "buyerId": "fan-orion",
   "service": "poem",
-  "price": 10,
+  "price": 5,
   "status": "delivered",
   "traceId": "共享的审计关联ID",
   "elapsedMs": 75,
-  "balanceAfter": 90,
+  "balanceAfter": 95,
   "delivery": {
     "pieces": [{
       "star": "star-a", "service": "poem", "title": "作品标题", "text": "作品正文",

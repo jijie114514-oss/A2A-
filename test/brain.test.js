@@ -64,7 +64,10 @@ test('disabled fallback fails; caller cancellation never triggers delivery fallb
 });
 test('config refuses silent live fallback and unsupported cloud mode', () => {
   assert.throws(() => config({ LLM_PROVIDER: 'openai-compatible' }), e => e.code === 'missing_api_config');
-  assert.throws(() => config({ STARHALL_MODE: 'cloud' }), e => e.code === 'unsupported_mode');
+  assert.throws(() => config({ STARHALL_MODE: 'cloud' }), e => e.code === 'invalid_config'); // cloud 默认 postgres，必须有 DATABASE_URL
+  assert.equal(config({ STARHALL_MODE: 'cloud', DATABASE_URL: 'postgresql://u:p@example.invalid/starhall' }).store, 'postgres');
+  assert.equal(config({ STARHALL_MODE: 'cloud', STARHALL_STORE: 'memory' }).store, 'memory');
+  assert.throws(() => config({ STARHALL_STORE: 'mysql' }), e => e.code === 'invalid_config');
   assert.throws(() => config({ STARHALL_HOST: '0.0.0.0' }), e => e.code === 'invalid_config');
   assert.throws(() => config({ LLM_TIMEOUT_MS: '999999' }), e => e.code === 'invalid_config');
   assert.throws(() => config({ LLM_THINKING: 'typo' }), e => e.code === 'invalid_config');

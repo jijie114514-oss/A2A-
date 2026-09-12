@@ -28,15 +28,15 @@ test('Test 1: healthy Sales Pitch is not refunded, revision is available, Fan Su
   assert.equal(order.status, 'delivered'); assert.equal(order.deliveryStatus, 'REVISION_AVAILABLE');
   assert.equal(order.refundEligible, false); assert.equal(order.refundReason, null);
   assert.equal(order.revisionAvailable, true); assert.equal(order.revisionUsed, false);
-  assert.equal(order.remedy, 'ONE_FREE_REVISION'); assert.equal(order.chargedCredits, 8);
-  assert.equal(boardRow(app.store.read(), 'star-a').fanSupport, 8);
+  assert.equal(order.remedy, 'ONE_FREE_REVISION'); assert.equal(order.chargedCredits, 5);
+  assert.equal(boardRow(app.store.read(), 'star-a').fanSupport, 5);
 });
 
 // ── Test 2: empty delivery → automatic refund, Fan Support and revenue rolled back ──
 test('Test 2: empty Sales Pitch delivery is machine-refunded with EMPTY_DELIVERY; support and revenue revert', async t => {
   const { app } = await setup(t);
   const order = await app.order(buyer, pitch, 't2');
-  assert.equal(app.wallet(buyer).balance, 92);
+  assert.equal(app.wallet(buyer).balance, 95);
   await corrupt(app, order.id, o => { o.delivery.pieces[0].text = ''; });
   const verdict = verifyDelivery(app.store.read().orders.find(o => o.id === order.id), getService('sales-pitch'));
   assert.equal(verdict.ok, false); assert.equal(verdict.refundReason, 'EMPTY_DELIVERY');
@@ -78,7 +78,7 @@ test('Test 5: one free revision: no refund, no recharge, one-time only, no extra
   const rev = await app.revisionRequest(buyer, order.id, { notes: '风格更简洁一些' }, 'rev-1');
   assert.equal(rev.chargedCredits, 0); assert.equal(rev.revisionAvailable, false); assert.equal(rev.revisionUsed, true);
   assert.ok(rev.revision.pieces.length > 0); assert.equal(app.wallet(buyer).balance, balance);
-  assert.equal(boardRow(app.store.read(), 'star-a').fanSupport, 8, 'revision must not add Fan Support');
+  assert.equal(boardRow(app.store.read(), 'star-a').fanSupport, 5, 'revision must not add Fan Support');
   assert.equal(app.store.read().orders.filter(o => o.buyerId === buyer.id && o.status === 'delivered').length, 1, 'no new paid order');
   const replay = await app.revisionRequest(buyer, order.id, { notes: '风格更简洁一些' }, 'rev-1');
   assert.equal(replay.replayed, true); assert.equal(replay.revision.id, rev.revision.id);
@@ -94,7 +94,7 @@ test('Test 6: inactive sponsorship with zero impressions is refunded; Sponsor Su
   const { app } = await setup(t);
   const order = await app.order(buyer, sponsor(), 't6');
   assert.equal(order.delivery.sponsorship.status, 'ACTIVE');
-  assert.equal(boardRow(app.store.read(), 'star-b').sponsorSupport, 9);
+  assert.equal(boardRow(app.store.read(), 'star-b').sponsorSupport, 6);
   await app.store.transaction(s => { s.ads.find(a => a.id === order.delivery.ad.id).status = 'inactive'; });
   const r = await app.refund(buyer, order.id, { reason: '广告未激活' });
   assert.equal(r.decision, 'REFUNDED'); assert.equal(r.refundReason, 'ADVERTISEMENT_ACTIVATION_FAILED');
@@ -114,8 +114,8 @@ test('Test 7: sponsorship with real impressions is not refundable', async t => {
   const r = await app.refund(buyer, order.id, { reason: '广告没效果' });
   assert.equal(r.decision, 'DECLINED'); assert.equal(r.declineCode, 'IMPRESSIONS_ALREADY_SERVED');
   assert.equal(r.refundEligible, false); assert.equal(r.refundReason, null);
-  assert.equal(app.wallet(buyer).balance, 85);
-  assert.equal(boardRow(app.store.read(), 'star-b').sponsorSupport, 9, 'sponsor support survives once impressions were served');
+  assert.equal(app.wallet(buyer).balance, 90);
+  assert.equal(boardRow(app.store.read(), 'star-b').sponsorSupport, 6, 'sponsor support survives once impressions were served');
 });
 
 // ── Test 8: idempotent refund: single credit-back, single rollback, single refund event ──
@@ -146,7 +146,7 @@ test('Test 9: board score, rank, support and pressure all recompute after a spon
   const ad = await app.order(buyer, sponsor(), 't9-ad');
   let board = marketBoard(app.store.read());
   assert.equal(board.ranking[0].star, 'star-b');
-  assert.equal(board.ranking[0].sponsorSupport, 9);
+  assert.equal(board.ranking[0].sponsorSupport, 6);
   assert.equal(board.ranking[0].activeSponsors, 1);
   assert.equal(board.ranking[0].sponsorPressure, 'LOW');
   await app.store.transaction(s => { s.ads.find(a => a.id === ad.delivery.ad.id).status = 'inactive'; });
@@ -170,7 +170,7 @@ test('Test 10: a refunded Deal Coach is attempted usage, not successful paid beh
   assert.equal(r.refundReason, 'PRICE_FLOOR_VIOLATION');
   const profile = await app.commercialProfile(buyer);
   assert.equal(profile.totals.successfulPaidOrders, 1, 'refunded order excluded from successful paid totals');
-  assert.equal(profile.totals.paidCredits, 8);
+  assert.equal(profile.totals.paidCredits, 5);
   const dealHistory = profile.history.find(h => h.orderId === dealOrder.id);
   assert.equal(dealHistory.status, 'refunded'); assert.equal(dealHistory.credits, 0);
   const usageSignal = profile.signals.find(s => s.orderId === dealOrder.id && s.field === 'serviceDelivered');

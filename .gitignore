@@ -4,3 +4,6 @@ data/
 artifacts/
 *.log
 coverage/
+.neon
+.vercel
+.env*

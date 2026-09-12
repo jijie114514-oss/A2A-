@@ -21,7 +21,7 @@ test('ad services deliver instantly, land in public summary, and are verified vi
   const before = app.wallet(buyer).balance;
   const order = await app.order(buyer, { service: 'ad-pin', input: { text: 'XX队代码审查：15分一次，5分钟交付。' } }, 'ad-pin-1');
   assert.equal(order.status, 'delivered');
-  assert.equal(app.wallet(buyer).balance, before - 15);
+  assert.equal(app.wallet(buyer).balance, before - 10);
   assert.equal(order.delivery.ad.tier, 'ad-pin');
   assert.equal(order.delivery.ad.status, 'active');
   assert.equal(order.delivery.ad.displays, 0);
@@ -90,7 +90,7 @@ test('ad purchases do not pollute star rankings or star memories', async t => {
   await app.order(buyer, { service: 'ad-pin', input: { text: 'XX队广告' } }, 'ad-clean');
   const summary = await app.summary();
   assert.equal(summary.ranking.reduce((n, s) => n + s.tips, 0), 0);
-  assert.equal(summary.totalCredits, 15);
+  assert.equal(summary.totalCredits, 10);
   assert.equal(summary.ads.totalPlaced, 1);
   assert.deepEqual(app.store.read().memories, {});
   const wall = await app.wall(buyer);

@@ -37,9 +37,9 @@ test('A/E/F: zero-data board, honest trial/demo activity, successful paid fan su
   assert.equal(pre.phase, 'PRE-MARKET'); assert.equal(pre.activity.trial, 1); assert.equal(pre.activity.demo, 1);
   assert.ok(pre.ranking.every(r => r.fanSupport === 0));
   const order = await app.order(buyer, pitch, 'paid');
-  assert.equal(order.status, 'delivered'); assert.equal(app.wallet(buyer).balance, 92);
+  assert.equal(order.status, 'delivered'); assert.equal(app.wallet(buyer).balance, 95);
   const live = await app.marketBoard(); assert.equal(live.phase, 'MARKET LIVE');
-  assert.equal(live.ranking.find(r => r.star === 'star-a').fanSupport, 8);
+  assert.equal(live.ranking.find(r => r.star === 'star-a').fanSupport, 5);
   assert.equal(live.ranking.find(r => r.star === 'star-a').sponsorSupport, 0);
   const profile = await app.commercialProfile(buyer);
   assert.deepEqual([...new Set(profile.signals.map(s => s.evidenceClass))].sort(), ['BEHAVIORAL', 'EXPLICIT', 'OBSERVED']);
@@ -52,10 +52,10 @@ test('B/C/D: star-bound support, plan pricing, total score, rank weights and rea
   const { app } = await setup(t);
   await app.order(buyer, pitch, 'pitch'); await app.order(other, deal, 'deal');
   const ad = await app.order(buyer, sponsor(), 'sponsor');
-  assert.equal(ad.status, 'delivered'); assert.equal(ad.price, 15);
+  assert.equal(ad.status, 'delivered'); assert.equal(ad.price, 10);
   assert.equal(ad.delivery.sponsorship.status, 'ACTIVE'); assert.equal(ad.delivery.sponsorship.currentImpressions, 0);
   let board = marketBoard(app.store.read());
-  assert.deepEqual(board.ranking.map(r => r.starScore), [15, 9, 8]);
+  assert.deepEqual(board.ranking.map(r => r.starScore), [10, 6, 5]);
   assert.deepEqual(board.ranking.map(r => r.exposureWeight), [1.5, 1.2, 1]);
   assert.equal(board.ranking.find(r => r.star === 'star-b').fanSupport, 0);
   for (let i = 0; i < 3; i++) await app.order(third, sponsor(), `crowd-${i}`);
@@ -66,7 +66,7 @@ test('B/C/D: star-bound support, plan pricing, total score, rank weights and rea
   assert.equal(app.store.read().memories['star-b'], undefined);
   await app.store.transaction(s => { s.ads.filter(a => a.starId === 'star-b').forEach(a => { a.expiresAt = '2000-01-01T00:00:00Z'; }); });
   board = marketBoard(app.store.read()); assert.equal(board.ranking.find(r => r.star === 'star-b').activeSponsors, 0);
-  assert.equal(board.ranking.find(r => r.star === 'star-b').sponsorSupport, 36);
+  assert.equal(board.ranking.find(r => r.star === 'star-b').sponsorSupport, 24);
 });
 test('G/H: passive placement targets its star; activation, reads, retries and failed orders cannot inflate exposure', async t => {
   const { app } = await setup(t);
@@ -108,7 +108,7 @@ test('C/H: weighted shared slots give all stars exposure and rotate competing sp
   const state = { orders: [], ads: [], wall: [], marketSettings: { sponsorSupportWeight: 0.6, exposureMultipliers: [1.5, 1.2, 1] } };
   for (const starId of ['star-a', 'star-b', 'star-c']) {
     const id = `ad-${starId}`; const ad = { id, orderId: id, buyerId: starId, starId, tier: 'ad-pin', advertiser: 'Fixture', text: 'Fixture ad', status: 'active', kind: 'paid', displays: 0, createdAt: '2026-01-01' };
-    state.ads.push(ad); state.orders.push({ id, status: 'delivered', price: 15, delivery: { ad } });
+    state.ads.push(ad); state.orders.push({ id, status: 'delivered', price: 10, delivery: { ad } });
   }
   for (let i = 0; i < 37; i++) boardResponse(state, 'public');
   assert.deepEqual(state.ads.map(a => a.displays), [15, 12, 10]);
@@ -133,7 +133,7 @@ test('I: diagnostic uses own history and impressions; all findings carry evidenc
   assert.ok(findings.every(f => f.evidenceRefs.every(id => evidenceIds.has(id))));
   assert.ok(findings.filter(f => f.status !== 'UNKNOWN').every(f => f.evidenceRefs.length > 0));
   assert.equal(order.delivery.recommendedNextAction.action, 'validate-with-a-real-buyer');
-  assert.equal(app.wallet(buyer).balance, 32);
+  assert.equal(app.wallet(buyer).balance, 45);
 });
 test('I/permissions: manager gets only public board; buyer cannot choose another profile, stars cannot read storage; revoked diagnostic grant releases funds', async t => {
   const { app } = await setup(t);
@@ -205,7 +205,7 @@ test('HTTP core catalog, schemas, authenticated profile, manager demo board and 
 test('config centralizes sponsor and exposure weights and refuses invalid policies', async t => {
   const { app } = await setup(t, { SPONSOR_SUPPORT_WEIGHT: '0.5', STAR_EXPOSURE_MULTIPLIERS: '[2,1.5,1]', STARHALL_MARKET_PHASE: 'PRE-MARKET' });
   await app.order(buyer, sponsor(), 'weighted');
-  const board = marketBoard(app.store.read()); assert.equal(board.ranking[0].sponsorSupport, 7.5); assert.equal(board.ranking[0].exposureWeight, 2); assert.equal(board.phase, 'PRE-MARKET');
+  const board = marketBoard(app.store.read()); assert.equal(board.ranking[0].sponsorSupport, 5); assert.equal(board.ranking[0].exposureWeight, 2); assert.equal(board.phase, 'PRE-MARKET');
   for (const env of [{ SPONSOR_SUPPORT_WEIGHT: '-1' }, { STAR_EXPOSURE_MULTIPLIERS: '[1,0,0]' }, { STAR_EXPOSURE_MULTIPLIERS: '[1,3,2]' }, { STARHALL_MARKET_PHASE: 'fake' }]) assert.throws(() => config(env), e => e.code === 'invalid_config');
 });
 test('delivery failure and denied board calls do not expose ads or create commercial signals', async t => {
@@ -285,8 +285,8 @@ test('refund arbitration: healthy deliveries decline with ONE_FREE_REVISION, fai
   r = await app.refund(buyer, paid.id); assert.equal(r.decision, 'DECLINED');
   await assert.rejects(app.refund(buyer, other.id), e => e.status === 404);
   await assert.rejects(app.refund(buyer, ad.delivery.ad.id), e => e.status === 404);
-  assert.equal(marketBoard(app.store.read()).ranking.find(r => r.star === 'star-a').fanSupport, 8);
-  assert.equal(marketBoard(app.store.read()).ranking.find(r => r.star === 'star-b').sponsorSupport, 9);
+  assert.equal(marketBoard(app.store.read()).ranking.find(r => r.star === 'star-a').fanSupport, 5);
+  assert.equal(marketBoard(app.store.read()).ranking.find(r => r.star === 'star-b').sponsorSupport, 6);
   app.brain = { options: { fallback: false }, generate: async () => { throw new AppError('invalid_model_output', 'fixture failure', 502); } };
   const failed = await app.order(buyer, pitch, 'failed');
   assert.equal(failed.status, 'failed'); assert.equal(failed.charged, 0);

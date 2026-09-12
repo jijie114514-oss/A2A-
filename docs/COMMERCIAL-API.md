@@ -26,10 +26,10 @@ npm run cli -- buy commercial-diagnostic examples/commercial-diagnostic.json fan
 
 | ID | 明星 | 本地积分 | 输入 |
 | --- | --- | ---: | --- |
-| sales-pitch | A · Sales Communication | 8 | productName、productDescription、price、targetBuyer、context；description/context至少一项 |
-| sales-stress-test | B · Sales Stress Test | 10 | 同上；分析调用方自己的商品，输出标为 SIMULATED |
-| deal-coach | C · Deal Closing | 15 | currentOffer、counterpartyMessage、budget、minimumAcceptablePrice、goal、context；至少一项有效交易场景 |
-| star-sponsorship | 绑定A/B/C，由ledger结算 | 按plan 8/15/20 | starId、plan、advertiser、adCopy 全部必填 |
+| sales-pitch | A · Sales Communication | 5 | productName、productDescription、price、targetBuyer、context；description/context至少一项 |
+| sales-stress-test | B · Sales Stress Test | 6 | 同上；分析调用方自己的商品，输出标为 SIMULATED |
+| deal-coach | C · Deal Closing | 10 | currentOffer、counterpartyMessage、budget、minimumAcceptablePrice、goal、context；至少一项有效交易场景 |
+| star-sponsorship | 绑定A/B/C，由ledger结算 | 按plan 5/10/15 | starId、plan、advertiser、adCopy 全部必填 |
 | commercial-diagnostic | C · 商业诊断 | 30 | 上述商品信息和goal均可选；没有历史时明确UNKNOWN |
 | market-board | 公共 | 0 | GET /v1/market-board |
 
@@ -73,9 +73,9 @@ Sales Pitch / Sales Stress Test 使用现有模型客户端、总45秒以内的�
 
 | plan | 价格 | 场景 | 结束条件 | 免费试用 |
 | --- | ---: | --- | --- | --- |
-| delivery | 8 | 所选明星的后续作品、练习、演示 | 10次实际附入交付；未有流量不会虚增 | 2次 |
-| leaderboard | 15 | 主动完整榜 / 随单Compact Board | 30分钟 | 5分钟 |
-| featured | 20 | 所选明星交付及公共榜的赞助区 | 30分钟 | 5分钟 |
+| delivery | 5 | 所选明星的后续作品、练习、演示 | 10次实际附入交付；未有流量不会虚增 | 2次 |
+| leaderboard | 10 | 主动完整榜 / 随单Compact Board | 30分钟 | 5分钟 |
+| featured | 15 | 所选明星交付及公共榜的赞助区 | 30分钟 | 5分钟 |
 
 购买立即交付 ACTIVE 激活回执，不等待未来次数耗尽。`delivery.sponsorship` 返回 adId、starId、placement、startedAt、expiresAt、currentImpressions=0、trackingEndpoint。初始回执是不可变快照；实时信息查 trackingEndpoint。`ads`兼容字段中的status保持原小写 active/fulfilled/expired；赞助激活回执使用大写ACTIVE。
 
@@ -83,7 +83,7 @@ Sales Pitch / Sales Stress Test 使用现有模型客户端、总45秒以内的�
 
 ## 排名和投放规则
 
-`Fan Support = Σ已成功交付、非广告、paid订单分配给该明星的积分`。旧duet继续按A 8/B 7分配。`Sponsor Support = Σ成功paid、绑定该明星的赞助积分 × SPONSOR_SUPPORT_WEIGHT`。两者相加为starScore，降序排名；平分按starId稳定排序，目录明确平分顺序不代表更热门。
+`Fan Support = Σ已成功交付、非广告、paid订单分配给该明星的积分`。旧duet继续按两星各半分配（当前标价8分，星B 4 / 星A 4）。`Sponsor Support = Σ成功paid、绑定该明星的赞助积分 × SPONSOR_SUPPORT_WEIGHT`。两者相加为starScore，降序排名；平分按starId稳定排序，目录明确平分顺序不代表更热门。
 
 trial、demo、failed、refunded以及带refund/refunded/refundedAt标记的退款单均不进入支持分。既有未绑定明星的广告不被猜测归属，也不增加任何明星 Sponsor Support。到期/耗尽只结束未来曝光，不撤销合法历史赞助支持；退款则同时失去支持和活动资格。
 

@@ -1,12 +1,10 @@
 import { mkdir, readFile, rename, open, unlink } from 'node:fs/promises';
 import path from 'node:path';
-import { randomUUID, randomBytes, createHash, timingSafeEqual } from 'node:crypto';
-import { ensure } from './errors.js';
-import { STARS } from './catalog.js';
-import { marketBoard, MARKET_DEFAULTS, eligiblePaid, activeAd } from './market.js';
+import { randomUUID, randomBytes, timingSafeEqual } from 'node:crypto';
+import { ensure } from '../errors.js';
+import { MARKET_DEFAULTS } from '../market.js';
+import { now, hash, emptyState, normalizeState, sweepExpired, enforceRateLimit, summaryOf, defaultCredentials, credentialsMatch } from './shared.js';
 
-export const hash = text => createHash('sha256').update(text).digest('hex');
-export const now = () => new Date().toISOString();
 export async function atomicJson(file, value) {
   await mkdir(path.dirname(file), { recursive: true });
   const temp = `${file}.${randomUUID()}.tmp`;
@@ -14,25 +12,21 @@ export async function atomicJson(file, value) {
   try { await handle.writeFile(JSON.stringify(value, null, 2) + '\n'); await handle.sync(); } finally { await handle.close(); }
   try { await rename(temp, file); } catch (error) { await unlink(temp).catch(() => {}); throw error; }
 }
-export function summaryOf(state) {
-  const paid = state.wall.filter(w => w.amount > 0 && (!w.kind || w.kind === 'paid') && eligiblePaid(state.orders.find(o => o.id === w.id)));
-  const trials = state.wall.filter(w => w.kind === 'trial');
-  const ranking = marketBoard(state).ranking.map(row => ({ ...row, name: STARS[row.star].name, trials: trials.filter(w => w.stars.includes(row.star)).length }));
-  const ads = state.ads || [];
-  const activeAds = ads.filter(a => activeAd(state, a));
-  const latest = state.wall.slice(-20).reverse().map(({ buyerName, stars, amount, serviceName, createdAt, kind }) => ({ buyerName, stars, amount, serviceName, createdAt, kind: kind || 'paid' }));
-  return { mode: 'local', ranking, latest, totalPurchases: paid.length, totalCredits: paid.reduce((n, w) => n + w.amount, 0), totalTrials: trials.length, totalDemos: state.wall.filter(w => w.kind === 'demo').length,
-    ads: { pinned: activeAds.filter(a => !a.starId && a.tier === 'ad-pin').sort((a, b) => a.createdAt.localeCompare(b.createdAt)).map(a => ({ id: a.id, team: a.buyerName, text: a.text, kind: a.kind, until: a.expiresAt, displays: a.displays })), activeCount: activeAds.length, totalPlaced: ads.length, note: '置顶广告按投放先后排序；没有真实投放时列表为空，不展示虚构广告。' },
-    pinnedThanks: paid.filter(w => w.pinned).slice(-3).reverse().map(w => ({ buyerName: w.buyerName, thanks: `感谢 ${w.buyerName} 的金主支持！`, createdAt: w.createdAt })),
-    patronOffer: { service: 'patron', price: 20, message: '金主套餐交付完整作品并进入感谢区；当前没有金主时不展示虚构记录。' } };
-}
-export class Store {
+
+/** 本地单进程驱动：保留 process.lock 互斥与「重启即中断」的语义，行为与 0.5.0-local 一致。 */
+export class FileStore {
   #queue = Promise.resolve();
   #auditQueue = Promise.resolve();
   #projectionQueue = Promise.resolve();
   #state;
   #lock;
-  constructor(dir, market = MARKET_DEFAULTS) { this.dir = dir; this.market = market; }
+  constructor(options = {}) {
+    this.dir = options.dataDir || path.resolve('data');
+    this.market = options.market || MARKET_DEFAULTS;
+    this.mode = options.mode || 'local';
+    this.store = 'file';
+    this.dataSet = path.basename(this.dir);
+  }
   async open() {
     await mkdir(this.dir, { recursive: true });
     const file = path.join(this.dir, 'process.lock');
@@ -48,13 +42,12 @@ export class Store {
     await this.#lock.writeFile(JSON.stringify({ pid: process.pid, startedAt: now() }));
     try {
       try { this.#state = JSON.parse(await readFile(path.join(this.dir, 'state.json'), 'utf8')); }
-      catch (e) { if (e.code !== 'ENOENT') throw e; this.#state = { version: 1, accounts: [], orders: [], wall: [], memories: {}, practice: [], events: [] }; }
+      catch (e) { if (e.code !== 'ENOENT') throw e; this.#state = emptyState(); }
       ensure(this.#state.version === 1 && Array.isArray(this.#state.orders), 'invalid_state', '本地存档版本无效');
+      this.#state.mode ||= this.mode;
       await this.transaction(state => {
-        if (!Array.isArray(state.ads)) state.ads = [];
-        state.marketSettings = structuredClone(this.market);
-        state.commercialSignals ||= []; state.impressions ||= []; state.marketMoves ||= [];
-        state.marketStartedAt ||= state.orders.find(eligiblePaid)?.completedAt || null;
+        normalizeState(state, this.market);
+        // 单进程本地语义：能走到这里说明上次进程已经中断，在飞的预留在启动时立即释放。
         for (const order of state.orders.filter(o => o.status === 'pending')) {
           order.status = 'failed'; order.error = { code: 'interrupted', message: '上次进程中断，已释放预留积分，请使用新的幂等键重试' }; order.completedAt = now();
         }
@@ -64,9 +57,12 @@ export class Store {
     } catch (e) { await this.close(); throw e; }
   }
   read() { return structuredClone(this.#state); }
+  /** file 驱动没有跨实例状态，每请求刷新是空操作（快照就在进程内存里）。 */
+  async refresh() { return this.read(); }
   transaction(fn) {
     const work = this.#queue.then(async () => {
       const draft = structuredClone(this.#state);
+      sweepExpired(draft);
       const output = await fn(draft);
       await atomicJson(path.join(this.dir, 'state.json'), draft);
       this.#state = draft;
@@ -78,7 +74,7 @@ export class Store {
   audit(event) {
     const work = this.#auditQueue.then(async () => {
       const file = await open(path.join(this.dir, 'audit.jsonl'), 'a', 0o600);
-      try { await file.writeFile(JSON.stringify({ ...event, hostMode: 'local' }) + '\n'); await file.sync(); } finally { await file.close(); }
+      try { await file.writeFile(JSON.stringify({ ...event, hostMode: this.mode }) + '\n'); await file.sync(); } finally { await file.close(); }
     });
     this.#auditQueue = work.catch(() => {});
     return work;
@@ -99,21 +95,17 @@ export class Store {
     this.#projectionQueue = work.catch(() => {});
     return work;
   }
+  async probe() { return true; }
   async seed() {
     let credentials;
     try { credentials = JSON.parse(await readFile(path.join(this.dir, 'credentials.json'), 'utf8')); }
     catch (e) { if (e.code !== 'ENOENT') throw e; }
     if (credentials) {
-      ensure(credentials.accounts.every(a => this.#state.accounts.some(b => a.id === b.id && hash(a.token) === b.tokenHash)), 'invalid_credentials', '凭据与存档不匹配');
+      ensure(credentialsMatch(credentials, this.#state), 'invalid_credentials', '凭据与存档不匹配');
       return credentials;
     }
     ensure(this.#state.accounts.length === 0, 'missing_credentials', '凭据文件缺失，不能自动重置现有身份');
-    credentials = { mode: 'local', accounts: [
-      { id: 'broker', name: '星辉经纪人', role: 'broker', balance: 100 },
-      { id: 'fan-orion', name: '猎户座队', role: 'customer', balance: 100 },
-      { id: 'fan-lyra', name: '天琴座队', role: 'customer', balance: 100 },
-      { id: 'fan-vega', name: '织女星队', role: 'customer', balance: 100 },
-    ].map(a => ({ ...a, token: randomBytes(32).toString('hex') })) };
+    credentials = defaultCredentials(this.mode);
     // Credentials first: an interrupted initialization never silently remints balances.
     await atomicJson(path.join(this.dir, 'credentials.json'), credentials);
     await this.transaction(s => { s.accounts = credentials.accounts.map(({ token, ...a }) => ({ ...a, tokenHash: hash(token) })); });
@@ -125,6 +117,34 @@ export class Store {
     const account = this.#state.accounts.find(a => timingSafeEqual(Buffer.from(a.tokenHash), digest));
     ensure(account, 'unauthorized', '无效的本地身份凭据', 401);
     return { id: account.id, role: account.role, name: account.name };
+  }
+  /** 自助开户：外部 agent 不经人工审批即可拿到本地顾客身份。
+   *  handle + secret 决定归属：同一对再次调用只轮换令牌，secret 不匹配则拒绝。
+   *  令牌只返回一次，存档里只留摘要；账号初始余额与既有顾客一致（本地模拟积分）。 */
+  async registerAgent({ handle, name, secret, credits = 100, maxAccounts = 500 }) {
+    const claim = hash(`${handle}:${secret}`);
+    const token = randomBytes(32).toString('hex');
+    const result = await this.transaction(state => {
+      const existing = state.accounts.find(a => a.handle === handle);
+      if (existing) {
+        ensure(existing.role === 'customer', 'forbidden', '该 handle 属于平台内部身份，不开放开户', 403);
+        const sameClaim = typeof existing.claimHash === 'string' && existing.claimHash.length === claim.length && timingSafeEqual(Buffer.from(existing.claimHash), Buffer.from(claim));
+        ensure(sameClaim, 'handle_taken', '该 handle 已被另一个 secret 注册；请更换 handle，或用注册时的原 secret 调用以轮换令牌', 409);
+        existing.tokenHash = hash(token); existing.tokenRotatedAt = now();
+        return { account: structuredClone(existing), created: false };
+      }
+      ensure(state.accounts.length < maxAccounts, 'registration_closed', '本部署开户名额已满，请稍后重试或联系运营方', 503);
+      const account = { id: `agent-${handle}`, name, role: 'customer', balance: credits, handle, claimHash: claim, tokenHash: hash(token), createdAt: now() };
+      state.accounts.push(account);
+      return { account: structuredClone(account), created: true };
+    });
+    await this.audit({ id: randomUUID(), type: 'starhall.agent.registered', outcome: 'allowed', actor: { kind: 'agent', agentId: result.account.id },
+      purpose: 'self-service-onboarding', created: result.created, at: now() });
+    return { ...result, token };
+  }
+  async rateLimit({ bucket, key, perHour }) {
+    const message = `开户请求过于频繁：每小时最多 ${perHour} 次，请稍后重试`;
+    await this.transaction(state => enforceRateLimit(state, { bucket, key, perHour, message }));
   }
   async close() {
     await this.#queue; await this.#auditQueue; await this.#projectionQueue;

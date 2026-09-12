@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { Store, hash, now, summaryOf } from './store.js';
+import { createStore, hash, now, summaryOf, ORDER_LEASE_MS } from './store/index.js';
 import { Brain } from './brain.js';
 import { LocalKernel } from './kernel.js';
 import { STARS, SERVICES, getService, validateInput, catalog } from './catalog.js';
@@ -12,15 +12,22 @@ import { serviceGenerationHealth } from './health.js';
 import { registerBrokerTools } from './broker.js';
 
 export class StarHall {
-  constructor(store, brain) { this.store = store; this.brain = brain; this.bridge = new LocalKernel(store); this.inflight = new Map(); this.verifyDelivery = (order, service) => verifyDelivery(order, service); this.registerTools(); registerBrokerTools(this); }
+  constructor(store, brain, options = {}) { this.store = store; this.brain = brain; this.access = options.access || null; this.bridge = new LocalKernel(store, options.identity || {}); this.inflight = new Map(); this.verifyDelivery = (order, service) => verifyDelivery(order, service); this.registerTools(); registerBrokerTools(this); }
   static async open(config, brain) {
-    const store = await new Store(config.dataDir, config.market).open();
-    try { await store.seed(); return new StarHall(store, brain || new Brain(config.llm)); }
+    const store = await createStore(config).open();
+    try { await store.seed(); return new StarHall(store, brain || new Brain(config.llm), { access: config.access, identity: config.identity }); }
     catch (e) { await store.close(); throw e; }
   }
   authenticate(token) { return this.store.authenticate(token); }
+  /** 自助开户（外部 agent 无需人工审批）。校验集中在这里，HTTP 与 MCP 共用同一套规则。 */
+  registerAgent({ handle, name, secret, credits = 100, maxAccounts }) {
+    const normalized = string(handle, 'handle', 64).toLowerCase();
+    ensure(/^[a-z0-9][a-z0-9_-]{2,63}$/.test(normalized), 'invalid_input', 'handle 需要 3–64 位小写字母、数字、- 或 _，且以字母或数字开头');
+    ensure(typeof secret === 'string' && secret.length >= 16 && secret.length <= 256, 'invalid_input', 'secret 需要 16–256 字符；请自行生成并保管，服务端只保存摘要');
+    return this.store.registerAgent({ handle: normalized, name: name === undefined ? normalized : string(name, 'name', 60), secret, credits, ...(maxAccounts ? { maxAccounts } : {}) });
+  }
   catalog() {
-    const output = catalog();
+    const output = catalog(this.store.mode || 'local');
     const orders = this.store.read().orders;
     output.deliveryPolicy = { fallbackEnabled: this.brain.options?.fallback ?? false, fallbackCharged: true,
       explanation: '备用作品会明确标记并按目录价收费；失败订单不扣款。健康状态依据当前目录的最近订单，不保证未来请求成功。',
@@ -57,6 +64,8 @@ export class StarHall {
     output.extras.services = output.extras.services.map(enrich);
     output.market = { scope: 'single-team', teamId: 'starhall', externalTeamsConnected: 0,
       note: '三个明星属于同队。跨队赛事规则只能使用真实市场入口或明确标记的本地模拟市场演练。' };
+    // 仅在显式配置对外开放时附上接入信息；本地默认目录保持不变。
+    if (this.access) output.access = this.access;
     return output;
   }
   registerTools() {
@@ -140,7 +149,9 @@ export class StarHall {
         const account = state.accounts.find(a => a.id === order.buyerId);
         ensure(account.balance >= order.price, 'insufficient_balance', '余额不足', 402);
         const completedAt = now();
-        const allocations = order.kind === 'trial' ? Object.fromEntries(expected.map(star => [star, 0])) : s.id === 'duet' ? { 'star-b': 7, 'star-a': 8 } : { [s.star]: s.price };
+        const allocations = order.kind === 'trial' ? Object.fromEntries(expected.map(star => [star, 0])) : s.id === 'duet'
+          ? { 'star-b': Math.floor(s.price / 2), 'star-a': s.price - Math.floor(s.price / 2) }
+          : { [s.star]: s.price };
         const wallEntry = { id: order.id, buyerId: account.id, buyerName: account.name, stars: expected, amount: order.price,
           kind: order.kind || 'paid', service: s.id, serviceName: s.name, message: order.message,
           displayMessage: order.message || (order.kind === 'trial' ? `免费试用过${s.name}` : `支持${s.name}，期待这份作品！`), messageSource: order.message ? 'buyer' : 'system', pinned: s.id === 'patron' && order.kind !== 'trial', allocations, createdAt: completedAt };
@@ -329,7 +340,7 @@ export class StarHall {
     string(key, 'Idempotency-Key', 128);
     // Preflight through the real kernel before reserving any credit.
     const traceId = randomUUID();
-    const preflight = await this.bridge.kernel.authorize(this.bridge.context(actor.id, 'market-tip', traceId), { resource: { namespace: 'starhall', path: ['services', s.id], owner: { kind: 'human', userId: 'starhall-local-owner' } }, action: 'invoke' });
+    const preflight = await this.bridge.kernel.authorize(this.bridge.context(actor.id, 'market-tip', traceId), { resource: { namespace: 'starhall', path: ['services', s.id], owner: this.bridge.owner }, action: 'invoke' });
     ensure(preflight.allowed, 'forbidden', '当前身份无权购买此服务', 403);
     const fingerprint = hash(JSON.stringify({ service: s.id, input, message }));
     const order = await this.store.transaction(state => {
@@ -352,7 +363,8 @@ export class StarHall {
       const held = state.orders.filter(o => o.buyerId === actor.id && o.status === 'pending').reduce((n, o) => n + o.price, 0);
       const price = trial ? 0 : s.id === 'star-sponsorship' ? SPONSOR_PLANS[input.plan].price : s.price;
       ensure(account.balance - held >= price, 'insufficient_balance', '可用积分不足', 402);
-      const created = { id: randomUUID(), buyerId: actor.id, key, fingerprint, kind: trial ? 'trial' : 'paid', service: s.id, input, message, price, status: 'pending', traceId, createdAt: now(), testRunId: testRunId || null };
+      const created = { id: randomUUID(), buyerId: actor.id, key, fingerprint, kind: trial ? 'trial' : 'paid', service: s.id, input, message, price, status: 'pending', traceId, createdAt: now(),
+        expiresAt: new Date(Date.now() + ORDER_LEASE_MS).toISOString(), testRunId: testRunId || null };
       state.orders.push(created); return created;
     });
     if (order.status !== 'pending') return this.publicOrder(order);

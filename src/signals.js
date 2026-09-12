@@ -1,4 +1,5 @@
 import { campaignStats, eligiblePaid } from './market.js';
+import { getService } from './catalog.js';
 
 export const SALES_IDS = ['sales-pitch', 'sales-stress-test', 'deal-coach'];
 const concern = { 'sales-pitch': 'sales communication', 'sales-stress-test': 'offer validation', 'deal-coach': 'pricing and negotiation' };
@@ -39,13 +40,15 @@ export function commercialProfile(state, buyerId, currentInput = {}) {
 export function recommendedNextAction(state, buyerId) {
   const orders = state.orders.filter(o => o.buyerId === buyerId && o.status === 'delivered' && !o.refundedAt && !o.refund && !o.refunded);
   const used = id => orders.some(o => o.service === id);
+  // 推荐价一律从目录取，不在这里重复写死：改价只改 catalog，不会出现两处不一致。
+  const priceOf = id => getService(id)?.price ?? 0;
   if (used('commercial-diagnostic')) return { action: 'validate-with-a-real-buyer', price: 0, reason: 'Apply the diagnostic’s first action and collect real acceptance or rejection evidence before buying more analysis.' };
-  if (used('star-sponsorship') && (used('sales-pitch') || used('deal-coach'))) return { service: 'commercial-diagnostic', price: 30, reason: 'You have service and campaign history that can now be compared; impressions are not conversions.' };
+  if (used('star-sponsorship') && (used('sales-pitch') || used('deal-coach'))) return { service: 'commercial-diagnostic', price: priceOf('commercial-diagnostic'), reason: 'You have service and campaign history that can now be compared; impressions are not conversions.' };
   if (used('deal-coach') && used('sales-stress-test')) return { service: 'star-sponsorship', reason: 'Compare real audience, pressure and exposure weight on the free board before choosing a star.', firstStep: '/v1/market-board' };
-  if (used('sales-stress-test')) return { service: 'deal-coach', price: 15, reason: 'Bring an actual offer, budget or counterparty message to decide the next negotiation move.' };
-  if (used('sales-pitch')) return { service: 'sales-stress-test', price: 10, reason: 'Stress-test the offer you just expressed before using it with real buyers.' };
-  if (used('deal-coach')) return { service: 'sales-pitch', price: 8, reason: 'Clarify the product value supporting your price and negotiation position.' };
-  return { service: 'sales-pitch', price: 8, reason: 'Start with your product description or context to obtain immediately usable sales wording.' };
+  if (used('sales-stress-test')) return { service: 'deal-coach', price: priceOf('deal-coach'), reason: 'Bring an actual offer, budget or counterparty message to decide the next negotiation move.' };
+  if (used('sales-pitch')) return { service: 'sales-stress-test', price: priceOf('sales-stress-test'), reason: 'Stress-test the offer you just expressed before using it with real buyers.' };
+  if (used('deal-coach')) return { service: 'sales-pitch', price: priceOf('sales-pitch'), reason: 'Clarify the product value supporting your price and negotiation position.' };
+  return { service: 'sales-pitch', price: priceOf('sales-pitch'), reason: 'Start with your product description or context to obtain immediately usable sales wording.' };
 }
 export function diagnostic(profile) {
   const evidence = profile.evidence;

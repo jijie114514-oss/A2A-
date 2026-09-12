@@ -1,0 +1,23 @@
+# 自己的 VPS（阿里云轻量 / 腾讯云 / Hetzner / 搬瓦工…）上的 Caddy 反代配置
+# 用法：把 <你的域名> 换成真实域名并解析到这台机器，然后 docker compose up -d
+# Caddy 会自动申请并续期 Let's Encrypt 证书。
+
+<你的域名> {
+	encode zstd gzip
+	# StarHall 交付最长 115 秒，反代超时必须比它宽，否则别的 agent 会看到 502。
+	reverse_proxy starhall:4317 {
+		transport http {
+			read_timeout 180s
+			write_timeout 180s
+		}
+	}
+	# 面向 agent 的 JSON/MCP 服务，不需要 HSTS 预加载之类的浏览器特性，但保留 TLS 基线。
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+	}
+	log {
+		output file /var/log/caddy/access.log
+		format json
+	}
+}

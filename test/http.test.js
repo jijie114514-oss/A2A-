@@ -14,11 +14,12 @@ test('HTTP authentication, purchasing, ownership, input limits and purpose bound
   const request = async (route, options = {}) => {
     const response = await fetch(host.url + route, options); return { status: response.status, body: await response.json() };
   };
-  assert.equal((await request('/health')).body.cloudConnected, false);
+  const health = (await request('/health')).body;
+  assert.equal(health.mode, 'local'); assert.equal(health.store, 'file'); assert.equal(health.dbReady, true);
   const catalog = (await request('/v1/catalog')).body;
   assert.equal(catalog.services.length, 6);
-  assert.equal(catalog.extras.services.find(s => s.id === 'ad-pin').price, 15);
-  assert.equal(catalog.extras.services.find(s => s.id === 'ad-spot').price, 8);
+  assert.equal(catalog.extras.services.find(s => s.id === 'ad-pin').price, 10);
+  assert.equal(catalog.extras.services.find(s => s.id === 'ad-spot').price, 5);
   assert.equal((await request('/v1/summary')).status, 200);
   assert.equal((await request('/v1/wallet')).status, 401);
   assert.equal((await request('/v1/wallet', { headers: { authorization: 'Bearer forged' } })).status, 401);
@@ -35,6 +36,6 @@ test('HTTP authentication, purchasing, ownership, input limits and purpose bound
   const forged = await request('/v1/orders', { ...buy, body: JSON.stringify({ service: 'poem', input: { theme: '测试', recipient: '队伍' }, grants: ['write-ledger'] }) });
   assert.equal(forged.status, 400);
   assert.equal((await request('/v1/demo', { method: 'POST', headers, body: JSON.stringify({ input: { theme: '测试', recipient: '队伍' } }) })).status, 403);
-  const wallet = await request('/v1/wallet', { headers }); assert.equal(wallet.body.balance, 90);
+  const wallet = await request('/v1/wallet', { headers }); assert.equal(wallet.body.balance, 95);
   assert.ok(!JSON.stringify(order.body).includes(token('fan-orion')));
 });

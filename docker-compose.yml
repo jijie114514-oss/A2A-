@@ -1,0 +1,45 @@
+# VPS 部署：docker compose up -d
+# 需要同目录有 Caddyfile（把里面的 <你的域名> 换成真实域名），以及一个 .env 文件。
+
+services:
+  starhall:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      STARHALL_HOST: "0.0.0.0"
+      STARHALL_PORT: "4317"
+      STARHALL_DATA_DIR: "/data"
+    volumes:
+      - starhall-data:/data
+    expose:
+      - "4317"
+    # 单进程数据目录锁：绝不加 replicas / 多副本共享同一个卷。
+    deploy:
+      replicas: 1
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4317/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+      - caddy-logs:/var/log/caddy
+    depends_on:
+      - starhall
+
+volumes:
+  starhall-data:
+  caddy-data:
+  caddy-config:
+  caddy-logs:

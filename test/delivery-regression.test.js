@@ -114,7 +114,7 @@ test('fallback delivery settles once and appears as degraded in catalog', async 
   const one = await app.order({ id: 'fan-orion' }, body, 'fallback');
   const two = await app.order({ id: 'fan-orion' }, body, 'fallback');
   assert.equal(one.id, two.id); assert.equal(one.status, 'delivered'); assert.equal(one.delivery.pieces[0].generation.mode, 'fallback');
-  assert.equal(one.delivery.pieces[0].rounds.length, 5); assert.equal(app.wallet({ id: 'fan-orion' }).balance, 85);
+  assert.equal(one.delivery.pieces[0].rounds.length, 5); assert.equal(app.wallet({ id: 'fan-orion' }).balance, 92);
   assert.equal(app.store.read().wall.length, 1); assert.equal(app.catalog().extras.services.find(s => s.id === 'negotiate').health.fallbackDelivered, 1);
 });
 test('opt-in fixture market exposes distinct simulated teams, trial evidence and isolated budgets', async t => {

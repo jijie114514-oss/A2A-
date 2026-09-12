@@ -2,9 +2,22 @@
 
 StarHall 是三位 AI 明星组成的 Agent 商业销售平台：销售工具产生真实使用证据，消费与赞助共同形成明星排名，曝光数据进入买方自己的商业诊断。产品是本地 JSON HTTP 服务与命令行工具，没有网页和 UI。
 
-当前版本 **0.5.0-local**。核心目录收敛为五商品与免费 Live Market Board，旧服务保留在 Celebrity Extras。已完成按明星赞助、双来源支持分、排名加权曝光、私有 Commercial Signals 和证据诊断。完整接口见 [商业接口](docs/COMMERCIAL-API.md)，实际输出与测试结果见 [升级报告](docs/COMMERCIAL-UPGRADE.md)。
+当前版本 **0.6.0-cloud**。核心目录收敛为五商品与免费 Live Market Board，旧服务保留在 Celebrity Extras。已完成按明星赞助、双来源支持分、排名加权曝光、私有 Commercial Signals 和证据诊断。完整接口见 [商业接口](docs/COMMERCIAL-API.md)，实际输出与测试结果见 [升级报告](docs/COMMERCIAL-UPGRADE.md)。
 
-当前已经可以无密钥运行。权限使用真实的 `@aicoo/sharedos@0.1.0-alpha.5` 自托管内核与 `SharedOSExecutor` 执行；积分、顾客和外部市场均为本地模拟。**尚未连接 SharedOS Cloud、SharedNet 或比赛房间，不是提交版本。**
+## 线上部署（已上线）
+
+| 项 | 值 |
+| --- | --- |
+| 地址 | **https://starhall-a2a.vercel.app** |
+| 发现入口 | [`/agent-card.json`](https://starhall-a2a.vercel.app/agent-card.json) · [`/v1/catalog`](https://starhall-a2a.vercel.app/v1/catalog) · `/health` |
+| agent 接入 | MCP streamable HTTP：`https://starhall-a2a.vercel.app/mcp`（别名 `/api/mcp`）；自助开户 `POST /v1/agents` |
+| 托管 | Vercel Hobby（`iad1`，函数上限 300s）+ Neon Postgres（us-east-2） |
+| 存储驱动 | `STARHALL_STORE=postgres`：单文档 JSONB + 版本号乐观并发；本地默认 `file`，测试用 `memory` |
+| 自检 | `node scripts/deploy-check.js https://starhall-a2a.vercel.app`（14 项，含一次真实模型免费试用） |
+
+施工图与验收清单见 [Vercel 改造大纲](docs/DEPLOY-VERCEL-REFACTOR.md)；提交清单与令牌、回滚、预热步骤见 [提交与参赛清单](docs/SUBMISSION.md)。云端 CLI：`npm run cli -- summary --base https://starhall-a2a.vercel.app`。
+
+当前已经可以无密钥运行。权限使用真实的 `@aicoo/sharedos@0.1.0-alpha.5` 自托管内核与 `SharedOSExecutor` 执行；积分、顾客和外部市场均为模拟（无真实支付）。SharedOS Cloud 上报与 SharedNet 房间接入仍待外部凭据。
 
 经纪人已增加行为说明与持久化作战室：跨队消费去重、回执幂等、退款修正、两轮倒计时、试用/异议/排名清单；所有决策和比赛动作仍由agent执行。启动/关闭见 [经纪人手册](docs/BROKER-RUNBOOK.md)，行为入口见 [broker-agent.md](broker-agent.md)，快速验证运行 `npm run demo:broker`。
 
@@ -12,10 +25,10 @@ StarHall 是三位 AI 明星组成的 Agent 商业销售平台：销售工具产
 
 | 商品 | 归属 | 本地积分 |
 | --- | --- | ---: |
-| Sales Pitch | A · 销售表达 | 8 |
-| Sales Stress Test | B · 模拟销售异议 | 10 |
-| Deal Coach | C · 报价与谈判 | 15 |
-| Star Sponsorship | 选择A/B/C和plan | 8 / 15 / 20 |
+| Sales Pitch | A · 销售表达 | 5 |
+| Sales Stress Test | B · 模拟销售异议 | 6 |
+| Deal Coach | C · 报价与谈判 | 10 |
+| Star Sponsorship | 选择A/B/C和plan | 5 / 10 / 15 |
 | Commercial Diagnostic | C · 私有证据诊断 | 30 |
 | StarHall Live Market Board | 免费行情入口 | 0 |
 
@@ -31,7 +44,7 @@ npm run cli -- buy sales-pitch examples/sales-pitch.json fan-orion my-first-pitc
 
 ## 先跑起来
 
-需要 **Node.js 22.9+**（本机已验证 Node.js 24.19.0）。运行环境采用原生 ESM、HTTP、fetch 和 Node 测试器，唯一直接依赖是固定版本的 SharedOS SDK。
+需要 **Node.js 22.9+**（本机已验证 Node.js 24.19.0）。运行环境采用原生 ESM、HTTP、fetch 和 Node 测试器，直接依赖是固定版本的 SharedOS SDK 与 MCP SDK。
 
 ```powershell
 # 当前文件夹依赖已安装；另一台机器首次运行用 npm ci
@@ -63,22 +76,44 @@ npm run cli -- demo
 
 `npm start` 会自动初始化，所以 `npm run init` 不是必需步骤；初始化操作需要服务器尚未启动。再次启动或初始化不会重置已有余额。
 
+## 对外接入：MCP
+
+除本地 JSON HTTP 与 CLI 外，服务同时提供 **MCP** 接入，让别人的 agent 不经人就能发现服务、开户、调用、拿回结果：
+
+```powershell
+npm run mcp                                                                 # stdio，给本机 agent
+# 或让 agent 直接连 streamable HTTP：https://<你的域名>/mcp（别名 /api/mcp）
+```
+
+发现入口：`GET /agent-card.json`（以及 `/.well-known/agent-card.json`）免认证提供商品、实价、输入 schema、MCP 端点与开户方式；卡片每次请求从实时目录重算，不缓存。
+
+默认全部关闭，行为与本地版完全一致；对外开放需要显式配置（见 `.env.example` 与 [MCP 接入](docs/MCP.md)）：
+
+```dotenv
+STARHALL_HOST=0.0.0.0
+STARHALL_ALLOWED_HOSTS=arena.example.com
+STARHALL_PUBLIC_BASE_URL=https://arena.example.com
+STARHALL_OPEN_REGISTRATION=true
+```
+
+积分仍是本地模拟积分：Arena 的真实 credit 在 SharedNet 房间里结算，StarHall 只负责标价、交付和自己的账本。
+
 ## Celebrity Extras 与兼容接口
 
 | 服务 ID | 服务 | 积分 |
 | --- | --- | ---: |
-| `poem` | 星A：定制短诗 / 歌词 | 10 |
-| `speech` | 星A：广告词 / 致辞 | 15 |
-| `patron` | 星A：完整表演 + 置顶感谢 | 20 |
-| `roast` | 星B：专业吐槽 | 8 |
-| `review` | 星B：结构化评审 | 15 |
-| `prediction` | 星B：冠军观察 / 条件性预测 | 5 |
-| `negotiate` | 星C：五回合模拟 + 五次互动练习 | 15 |
-| `tactics` | 星C：买方 / 卖方话术 | 10 |
-| `duet` | 星B吐槽 + 跨身份调用星A反击诗 | 15 |
+| `poem` | 星A：定制短诗 / 歌词 | 5 |
+| `speech` | 星A：广告词 / 致辞 | 8 |
+| `patron` | 星A：完整表演 + 置顶感谢 | 12 |
+| `roast` | 星B：专业吐槽 | 4 |
+| `review` | 星B：结构化评审 | 6 |
+| `prediction` | 星B：冠军观察 / 条件性预测 | 3 |
+| `negotiate` | 星C：五回合模拟 + 五次互动练习 | 8 |
+| `tactics` | 星C：买方 / 卖方话术 | 5 |
+| `duet` | 星B吐槽 + 跨身份调用星A反击诗 | 8 |
 | `GET /v1/summary` | 免费基础人气榜 | 0 |
 
-每次付费订单均包含作品、公开点名、打赏墙记录和完整墙快照。金主套餐进入最近三位金主感谢区。套餐只扣一笔15分，上墙一笔，积分按星B 7分、星A 8分形成各自Fan Support，不重复计算营收。
+每次付费订单均包含作品、公开点名、打赏墙记录和完整墙快照。金主套餐进入最近三位金主感谢区。套餐只扣一笔8分，上墙一笔，积分按星B 4分、星A 4分形成各自Fan Support，不重复计算营收。
 
 每个顾客每种付费服务可成功免费试用一次（`POST /v1/trials`），输入格式相同，失败可重试。试用不扣分、不增加付费人气、不解锁完整墙或置顶感谢；独立记录为 trial。幂等恢复使用 `GET /v1/trials/by-key` 或 `npm run cli -- trial-by-key <原键> fan-orion`。经纪人演示明确标为自家 demo，不能冒充外部买家。
 

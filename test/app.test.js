@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { StarHall } from '../src/app.js';
 import { config } from '../src/config.js';
+import { getService } from '../src/catalog.js';
 import { SERVICES as ALL_SERVICES } from '../src/catalog.js';
 import { resource } from '../src/kernel.js';
 import { rehearseArena, fixtureMarket, planPurchases } from '../src/arena.js';
@@ -73,17 +74,19 @@ test('same-key parallel requests deliver once; changed body conflicts; buyer sco
   const { app } = await setup(t);
   const results = await Promise.all(Array.from({ length: 12 }, () => app.order(buyer, poem, 'same')));
   assert.equal(new Set(results.map(o => o.id)).size, 1);
-  assert.equal(app.wallet(buyer).balance, 90); assert.equal(app.store.read().wall.length, 1);
+  assert.equal(app.wallet(buyer).balance, 95); assert.equal(app.store.read().wall.length, 1);
   await assert.rejects(app.order(buyer, { ...poem, message: 'changed' }, 'same'), e => e.status === 409);
   assert.notEqual((await app.order(other, poem, 'same')).id, results[0].id);
   assert.throws(() => app.getOrder(other, results[0].id), e => e.status === 404);
 });
 test('parallel reservations cannot overspend and failed generation releases holds', async t => {
   const { app } = await setup(t);
-  await app.store.transaction(s => { s.accounts.find(a => a.id === buyer.id).balance = 15; });
+  // 余额从目录取，不再写死：只够买一件，第二件必须被拒。
+  const poemPrice = getService('poem').price;
+  await app.store.transaction(s => { s.accounts.find(a => a.id === buyer.id).balance = poemPrice * 2 - 1; });
   const results = await Promise.allSettled([app.order(buyer, poem, 'one'), app.order(buyer, poem, 'two')]);
   assert.equal(results.filter(r => r.status === 'fulfilled' && r.value.status === 'delivered').length, 1);
-  assert.equal(app.wallet(buyer).balance, 5); assert.equal(app.wallet(buyer).held, 0);
+  assert.equal(app.wallet(buyer).balance, poemPrice - 1); assert.equal(app.wallet(buyer).held, 0);
   const failed = await setup(t, { generate: async () => { throw new Error('secret-provider-detail'); } });
   const order = await failed.app.order(buyer, poem, 'failure'); assert.equal(order.status, 'failed');
   assert.equal(failed.app.wallet(buyer).balance, 100); assert.equal(failed.app.wallet(buyer).held, 0);
@@ -114,8 +117,9 @@ test('five interactive rounds preserve ownership and idempotency, with no new ch
   }
   assert.equal((await app.practice(buyer, id, { message: '我的提议1' }, 'round-1')).round, 1);
   await assert.rejects(app.practice(buyer, id, { message: '再来一次' }, 'round-6'), e => e.code === 'session_completed');
-  assert.equal(app.wallet(buyer).balance, 85);
+  assert.equal(app.wallet(buyer).balance, 92);
 });
+// file 驱动专属：重启即中断（pending → failed）与 projections 落盘只在单进程本地语义下成立。
 test('restart preserves delivery, membership and idempotency; pending holds recover', async t => {
   const dir = await mkdtemp(path.join(tmpdir(), 'starhall-restart-')); const settings = config({ STARHALL_DATA_DIR: dir });
   const first = await StarHall.open(settings);
@@ -124,7 +128,7 @@ test('restart preserves delivery, membership and idempotency; pending holds reco
   await first.close();
   const second = await StarHall.open(settings); t.after(() => second.close());
   assert.equal((await second.order(buyer, poem, 'persisted')).id, order.id);
-  assert.equal(second.wallet(buyer).balance, 90); assert.equal(second.wallet(buyer).held, 0);
+  assert.equal(second.wallet(buyer).balance, 95); assert.equal(second.wallet(buyer).held, 0);
   assert.equal(second.getOrder(buyer, 'pending-crash').status, 'failed');
   assert.equal((await second.wall(buyer)).wall.length, 1);
   const works = JSON.parse(await readFile(path.join(dir, 'stars', 'star-a', 'works', `${order.id}.json`), 'utf8'));

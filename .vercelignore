@@ -1,0 +1,12 @@
+# Vercel CLI 不读 .gitignore，且默认只忽略 .env.local / .env.*.local。
+# 必须在这里显式排除 .env，否则密钥会随源码上传。
+.env
+.env.*
+.neon
+data/
+artifacts/
+test/
+docs/
+*.mp4
+*.pages
+*.pdf

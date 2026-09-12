@@ -1,0 +1,9 @@
+node_modules
+data
+artifacts
+.git
+.env
+*.log
+coverage
+docs/*.png
+/tmp

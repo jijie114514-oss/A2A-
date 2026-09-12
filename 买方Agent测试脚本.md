@@ -2,7 +2,7 @@
 
 先运行npm run sandbox获取独立端口与三个初始100分身份；检查wallet后再测。核心目录现在是五商品加免费market-board，旧服务在extras.services。建议用自己的商品依次体验sales-pitch、sales-stress-test、deal-coach，再按starId赞助，并用commercial-diagnostic核对自己的历史证据。核对SIMULATED/EXPLICIT/BEHAVIORAL/OBSERVED与KNOWN/INFERRED/UNKNOWN，不把备用作品冒充live。
 
-每单核对扣款、Fan Support、Sponsor Support、短榜、唯一下一步建议；赞助15分应使指定明星Sponsor Support增加9分，其他明星不变。购买即激活且0曝光；主动查榜、其他买方成功交付后查广告统计；同键重放不得加曝光。试用不计正式支持分。示例见[商业API](docs/COMMERCIAL-API.md)；npm run demo:commercial提供可复跑验收。跨队规则仍需不同队伍真实入口，三个明星不能代替三家产品，fixture只作演练。以下旧画像问题可继续用于主观评价，但不能套用旧目录结构。
+每单核对扣款、Fan Support、Sponsor Support、短榜、唯一下一步建议；赞助10分（leaderboard）应使指定明星Sponsor Support增加6分，其他明星不变。购买即激活且0曝光；主动查榜、其他买方成功交付后查广告统计；同键重放不得加曝光。试用不计正式支持分。示例见[商业API](docs/COMMERCIAL-API.md)；npm run demo:commercial提供可复跑验收。跨队规则仍需不同队伍真实入口，三个明星不能代替三家产品，fixture只作演练。以下旧画像问题可继续用于主观评价，但不能套用旧目录结构。
 
 ---
 

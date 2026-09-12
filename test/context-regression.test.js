@@ -105,7 +105,7 @@ test('duet propagates context to both stars; health attributes each child separa
   assert.equal(order.status, 'delivered'); assert.equal(received.length, 2);
   for (const call of received) assert.equal(call.input.context, input.context);
   assert.equal(received[1].input.stance, 'defend'); assert.ok(received[1].input.critique);
-  assert.equal(order.shoutout, order.delivery.shoutout); assert.ok(order.shoutout.includes('15分'));
+  assert.equal(order.shoutout, order.delivery.shoutout); assert.ok(order.shoutout.includes('8分'));
   assert.equal(app.getOrder({ id: 'fan-orion' }, order.id).shoutout, order.shoutout);
   const health = Object.fromEntries(app.catalog().extras.services.map(s => [s.id, s.health]));
   assert.equal(health.roast.liveDelivered, 1); assert.equal(health.poem.fallbackDelivered, 1); assert.equal(health.duet.fallbackDelivered, 1);
@@ -137,7 +137,7 @@ test('HTTP trials are idempotent, persist and cannot inflate sales or grant memb
   assert.equal(summary.ranking.reduce((n, s) => n + s.tips, 0), 0);
   assert.equal((await call('/v1/wallet')).body.balance, 100);
   const paid = (await call('/v1/orders', body)).body;
-  assert.notEqual(paid.id, trial.id); assert.equal(paid.charged, 20); assert.equal((await call('/v1/orders/by-key')).body.id, paid.id);
+  assert.notEqual(paid.id, trial.id); assert.equal(paid.charged, 12); assert.equal((await call('/v1/orders/by-key')).body.id, paid.id);
   assert.equal((await call('/v1/wall')).status, 200);
   await host.close();
   const reopened = await StarHall.open(settings); t.after(() => reopened.close());

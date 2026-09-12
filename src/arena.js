@@ -1,5 +1,5 @@
 import { ensure } from './errors.js';
-import { now } from './store.js';
+import { now } from './store/shared.js';
 
 export const BROKER_POLICY = {
   version: 1, mode: 'local-rehearsal', ownTeamId: 'starhall', budget: 100, minimumSpend: 80, minimumOtherTeams: 3,

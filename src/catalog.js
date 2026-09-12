@@ -11,20 +11,20 @@ const service = (id, star, name, price, seconds, fields, brief) => ({ id, star, 
 // 广告位服务：无模型、即时生效，由平台账本（ledger）结算，不归属任何明星。
 const ad = (id, name, price, seconds, brief) => ({ id, star: 'ledger', ad: true, name, price, currency: 'local-credit', maxDeliverySeconds: seconds, fields: ['text'], brief });
 export const AD_SERVICES = [
-  ad('ad-spot', '随单展示位', 8, 15, '广告随之后每次付费/试用交付展示10次（“本作品由XX队赞助”）；买家可查实时展示次数'),
-  ad('ad-pin', '人气榜置顶位', 15, 15, '广告挂在免费人气榜顶部30分钟，按投放先后排序'),
-  ad('ad-sponsor', '表演冠名', 20, 15, '接下来30分钟所有交付作品开头带“本作品由XX队冠名呈现”'),
+  ad('ad-spot', '随单展示位', 5, 15, '广告随之后每次付费/试用交付展示10次（“本作品由XX队赞助”）；买家可查实时展示次数'),
+  ad('ad-pin', '人气榜置顶位', 10, 15, '广告挂在免费人气榜顶部30分钟，按投放先后排序'),
+  ad('ad-sponsor', '表演冠名', 15, 15, '接下来30分钟所有交付作品开头带“本作品由XX队冠名呈现”'),
 ];
 export const SERVICES = [
-  service('poem', 'star-a', '定制短诗 / 歌词', 10, 180, ['theme', 'recipient'], '约100字的定制短诗或歌词，含签名'),
-  service('speech', 'star-a', '产品广告词 / 胜利致辞', 15, 180, ['occasion', 'recipient'], '可直接使用的广告词或致辞；产品名可放在场合中'),
-  service('patron', 'star-a', '金主套餐', 20, 290, ['occasion', 'recipient'], '200–400字的完整表演作品，附置顶感谢'),
-  service('roast', 'star-b', '专业吐槽', 8, 120, ['description'], '约300字，犀利但不虚构事实的产品吐槽'),
-  service('review', 'star-b', '结构化产品评审', 15, 240, ['description'], '优势、具体异议、风险、改进建议和验证方法'),
-  service('prediction', 'star-b', '冠军观察 / 选品锦囊', 5, 60, [], '有材料时给出条件性预测；无材料时提供评分尺、核验问题、候选比较表与预算止损建议'),
-  service('negotiate', 'star-c', '模拟砍价对手', 15, 290, ['scenario'], '一次交付5回合买卖双方模拟对话及复盘；也可继续5次互动练习'),
-  service('tactics', 'star-c', '谈判话术锦囊', 10, 120, ['direction'], '买方或卖方可用的开场、探底、交换、收口、退出话术'),
-  service('duet', 'star-b', '吐槽 + 反击诗套餐', 15, 290, ['description', 'theme', 'recipient'], '星B点评目标产品，跨身份调用星A写反击诗；只扣一笔15分'),
+  service('poem', 'star-a', '定制短诗 / 歌词', 5, 180, ['theme', 'recipient'], '约100字的定制短诗或歌词，含签名'),
+  service('speech', 'star-a', '产品广告词 / 胜利致辞', 8, 180, ['occasion', 'recipient'], '可直接使用的广告词或致辞；产品名可放在场合中'),
+  service('patron', 'star-a', '金主套餐', 12, 290, ['occasion', 'recipient'], '200–400字的完整表演作品，附置顶感谢'),
+  service('roast', 'star-b', '专业吐槽', 4, 120, ['description'], '约300字，犀利但不虚构事实的产品吐槽'),
+  service('review', 'star-b', '结构化产品评审', 6, 240, ['description'], '优势、具体异议、风险、改进建议和验证方法'),
+  service('prediction', 'star-b', '冠军观察 / 选品锦囊', 3, 60, [], '有材料时给出条件性预测；无材料时提供评分尺、核验问题、候选比较表与预算止损建议'),
+  service('negotiate', 'star-c', '模拟砍价对手', 8, 290, ['scenario'], '一次交付5回合买卖双方模拟对话及复盘；也可继续5次互动练习'),
+  service('tactics', 'star-c', '谈判话术锦囊', 5, 120, ['direction'], '买方或卖方可用的开场、探底、交换、收口、退出话术'),
+  service('duet', 'star-b', '吐槽 + 反击诗套餐', 8, 290, ['description', 'theme', 'recipient'], '星B点评目标产品，跨身份调用星A写反击诗；只扣一笔8分'),
   ...AD_SERVICES,
   ...COMMERCIAL_SERVICES,
 ];
@@ -38,12 +38,12 @@ export function validateInput(s, input) {
   if (s.id === 'tactics') ensure(['buy', 'sell'].includes(clean.direction), 'invalid_input', 'direction 只能为 buy 或 sell');
   return clean;
 }
-export const VERSION = '0.5.0-local';
-function legacyCatalog() {
+export const VERSION = '0.6.0-cloud';
+function legacyCatalog(mode = 'local') {
   const free = { id: 'summary', name: '人气榜基础版', price: 0, currency: 'local-credit', fields: [], maxDeliverySeconds: 5,
     brief: '免费查看真实打赏与试用动态；不产生付费订单或会员权限', inputSchema: { type: 'object', properties: {}, additionalProperties: false },
     call: { method: 'GET', path: '/v1/summary', purpose: 'summary' } };
-  return { product: 'StarHall · 星辉舞台', version: VERSION, mode: 'local', payment: '本地模拟积分，无真实支付',
+  return { product: 'StarHall · 星辉舞台', version: VERSION, mode: mode, payment: '模拟积分，无真实支付；黑客松演示，不收款',
     services: [free, ...SERVICES.filter(s => !s.commercial).map(s => ({ ...s,
       inputSchema: s.ad ? { type: 'object', required: ['text'], additionalProperties: false,
         properties: { text: { type: 'string', minLength: 1, maxLength: 300, description: '广告词，将原样展示给其他买家；不得伪装成买家评价或虚构事实', examples: ['XX队代码审查服务：15分一次，5分钟内交付结构化报告。'] } } }
@@ -58,8 +58,8 @@ function legacyCatalog() {
     included: ['公开点名上墙', '完整打赏墙快照', '明星粉丝记忆'],
   };
 }
-export function catalog() {
-  const legacy = legacyCatalog();
+export function catalog(mode = 'local') {
+  const legacy = legacyCatalog(mode);
   const free = { ...legacy.services[0], id: 'market-board', name: 'StarHall Live Market Board', brief: '免费查看本队真实商业行情、明星支持与赞助压力。', call: { method: 'GET', path: '/v1/market-board', purpose: 'market-board-read' } };
   return { ...legacy, product: 'STARHALL — SELL BETTER IN THE ARENA', positioning: 'Three commercial stars, real local usage, sponsorship and evidence-based commercial analysis.',
     stars: Object.entries(STAR_ROLES).map(([starId, role]) => ({ starId, ...role })),

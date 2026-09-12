@@ -2,20 +2,22 @@ import { object, string, ensure } from './errors.js';
 
 const text = (maxLength = 2000) => ({ type: 'string', minLength: 1, maxLength });
 const amount = { type: 'number', minimum: 0, maximum: 1000000 };
+// 赞助分档：交付随单展示 / 人气榜置顶 / 表演冠名。价格与旧版广告位（ad-spot、ad-pin、ad-sponsor）保持一致，
+// 避免同一档位出现两个价。比赛前按真实市场带（同行 1–12 分）下调，diagnostic 保持 30 不变。
 export const SPONSOR_PLANS = {
-  delivery: { price: 8, tier: 'ad-spot', placement: 'delivery', impressions: 10, minutes: null },
-  leaderboard: { price: 15, tier: 'ad-pin', placement: 'leaderboard', impressions: null, minutes: 30 },
-  featured: { price: 20, tier: 'ad-sponsor', placement: 'featured-naming', impressions: null, minutes: 30 },
+  delivery: { price: 5, tier: 'ad-spot', placement: 'delivery', impressions: 10, minutes: null },
+  leaderboard: { price: 10, tier: 'ad-pin', placement: 'leaderboard', impressions: null, minutes: 30 },
+  featured: { price: 15, tier: 'ad-sponsor', placement: 'featured-naming', impressions: null, minutes: 30 },
 };
 const productProperties = { productName: text(160), productDescription: text(4000), price: amount, targetBuyer: text(500), context: text(4000) };
 const productSchema = { type: 'object', properties: productProperties, additionalProperties: false, anyOf: [{ required: ['productDescription'] }, { required: ['context'] }] };
 const make = (id, star, name, price, brief, inputSchema, example) => ({ id, star, name, price, brief, inputSchema, example, commercial: true, fields: [], currency: 'local-credit', maxDeliverySeconds: 120 });
 export const COMMERCIAL_SERVICES = [
-  make('sales-pitch', 'star-a', 'Sales Pitch', 8, 'Turn your product into a clear Agent-ready sales pitch.', productSchema,
+  make('sales-pitch', 'star-a', 'Sales Pitch', 5, 'Turn your product into a clear Agent-ready sales pitch.', productSchema,
     { productName: 'CodeLens', productDescription: '输入代码，输出带文件位置的审查报告', price: 20, targetBuyer: 'coding agents' }),
-  make('sales-stress-test', 'star-b', 'Sales Stress Test', 10, 'Simulate why buyers may reject your own offer. SIMULATED, not observed buyer feedback.', productSchema,
+  make('sales-stress-test', 'star-b', 'Sales Stress Test', 6, 'Simulate why buyers may reject your own offer. SIMULATED, not observed buyer feedback.', productSchema,
     { productDescription: '我方代码审查服务，输出风险清单', price: 20 }),
-  make('deal-coach', 'star-c', 'Deal Coach', 15, 'Get the next move for pricing and negotiation.', {
+  make('deal-coach', 'star-c', 'Deal Coach', 10, 'Get the next move for pricing and negotiation.', {
     type: 'object', additionalProperties: false, properties: { currentOffer: amount, counterpartyMessage: text(), budget: amount, minimumAcceptablePrice: amount, goal: text(), context: text(4000) },
     anyOf: ['currentOffer', 'counterpartyMessage', 'goal', 'context'].map(field => ({ required: [field] })),
   }, { currentOffer: 20, budget: 15, counterpartyMessage: '能否缩小范围？', goal: '预算内采购代码审查' }),
