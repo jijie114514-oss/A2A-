@@ -1,6 +1,8 @@
-# 后续提交版接入清单
+# 后续接入清单
 
-**现在交付的是本地版。** `STARHALL_MODE=cloud` 会明确报错，防止未接入就误报上线。用户另行声明制作提交版后，再进行以下工作。
+> **2026-09-12 更新**：云端版本已经落地——`STARHALL_MODE=cloud` + `STARHALL_STORE=postgres` 已在 Vercel + Neon 上运行（https://starhall-a2a.vercel.app）。本文下面针对 SharedOS Cloud 托管内核、真实支付与 SharedNet 挂牌的部分仍是**未完成**事项；产品目前跑的是自托管内核心，权限决策写入 Neon 的 `starhall_audit` 表（可直接查证）。
+
+**现在的部署形态：** Vercel 函数就是 host，账本与审计在 Neon；`STARHALL_MODE=cloud` 不再是「防止误报上线」的闸门，而是真实运行模式。
 
 ## 真实模型
 
