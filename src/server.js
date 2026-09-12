@@ -7,6 +7,7 @@ import { fixtureMarket } from './arena.js';
 import { VERSION } from './catalog.js';
 import { createMcpServer, toolDefinitions } from './mcp.js';
 import { buildAgentCard } from './agent-card.js';
+import { indexHtml, indexJson, HTML_HEADERS } from './landing.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 
 /** 开户限流：按来源地址做小时窗口。计数落在账本状态里，多实例（Vercel）下同样生效。 */
@@ -43,6 +44,17 @@ export function createHandler(app, options) {
       ensure(hostOk, 'invalid_host', '只接受本机或已声明的 Host（对外部署需设置 STARHALL_ALLOWED_HOSTS）', 403);
       // 云端每请求刷新快照（多实例下别的实例刚写入的账号/订单必须可见）；file/memory 是空操作。
       await app.store.refresh();
+      // 门厅：机器拿 JSON（默认），浏览器拿节目单。这里不是 API，业务接口在 /v1/* 与 /mcp。
+      if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/index.html' || url.pathname === '/landing')) {
+        if (String(req.headers.accept || '').includes('text/html')) {
+          // 先渲染再写头：渲染失败时还能由外层返回结构化 500，而不是留下半截响应。
+          const html = indexHtml(app, options);
+          res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', ...HTML_HEADERS });
+          return res.end(html);
+        }
+        return send(200, indexJson(app, options));
+      }
+      if (req.method === 'GET' && url.pathname === '/favicon.ico') { res.writeHead(204, { 'cache-control': 'public, max-age=86400' }); return res.end(); }
       // 发现入口：卡片每次请求都从实时目录重算，不落地也不缓存（同 ADR 0021 的 read time 原则）。
       if (req.method === 'GET' && cardPaths.includes(url.pathname)) {
         return send(200, buildAgentCard(app, { publicBaseUrl: options.publicBaseUrl, openRegistration: options.openRegistration,
