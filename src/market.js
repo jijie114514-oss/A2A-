@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { roundContext } from './rounds.js';
 
 export const MARKET_DEFAULTS = { sponsorSupportWeight: 0.6, exposureMultipliers: [1.5, 1.2, 1], phase: 'AUTO' };
 export const STAR_ROLES = {
@@ -125,7 +126,8 @@ export function boardResponse(state, actorId, key) {
   if (scope && state.boardReceipts[scope]) return state.boardReceipts[scope];
   const surfaceId = `board:${randomUUID()}`;
   const sponsors = expose(state, { surfaceId, traffic: 'ACTIVE' });
-  const result = { ...marketBoard(state), surfaceId, sponsors };
+  // 轮次也放在榜单回执里：买方 agent 轮询行情时顺带知道此刻该试用还是该购买。
+  const result = { ...marketBoard(state), round: roundContext(), surfaceId, sponsors };
   if (scope) state.boardReceipts[scope] = result;
   return result;
 }

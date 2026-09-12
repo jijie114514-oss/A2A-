@@ -52,6 +52,8 @@ test('目录与 agent card 暴露轮次、试用政策与交付条款', async t 
   assert.equal(catalog.delivery.hardTimeoutSeconds, DELIVERY_BUDGET_SECONDS);
   assert.equal(catalog.delivery.onTimeout, 'FAILED_NO_CHARGE');
   assert.ok(catalog.services.every(s => s.maxDeliverySeconds <= DELIVERY_BUDGET_SECONDS));
+  const board = await (await fetch(host.url + '/v1/market-board')).json();
+  assert.equal(board.round.id, catalog.round.id, '榜单回执也带轮次，买方轮询时就知道该试用还是该买');
   const card = await (await fetch(host.url + '/agent-card.json')).json();
   assert.equal(card.round.id, catalog.round.id);
   assert.match(card.howToParticipate.roundOne, /不要为服务付款/);
