@@ -39,3 +39,26 @@ test('HTTP authentication, purchasing, ownership, input limits and purpose bound
   const wallet = await request('/v1/wallet', { headers }); assert.equal(wallet.body.balance, 95);
   assert.ok(!JSON.stringify(order.body).includes(token('fan-orion')));
 });
+
+test('外部接入的失败语义：未知路径 404、只写入口 405、HEAD 可用', async t => {
+  const dataDir = await mkdtemp(path.join(tmpdir(), 'starhall-http2-'));
+  const host = await startServer(config({ STARHALL_DATA_DIR: dataDir, STARHALL_PORT: '0', STARHALL_PUBLIC_BASE_URL: 'https://example.test' })); t.after(() => host.close());
+  const get = (path, options = {}) => fetch(host.url + path, options);
+  // 打错 URL 的 agent 应该看到 404，而不是以为「只是缺 token」
+  const typo = await get('/v1/walelt');
+  assert.equal(typo.status, 404);
+  assert.equal((await typo.json()).error.code, 'not_found');
+  // 存在的路由但缺 token 仍然是 401
+  assert.equal((await get('/v1/wallet')).status, 401);
+  // 人类点开 POST 链接：405 + Allow + 调用示例
+  const clicked = await get('/v1/agents');
+  assert.equal(clicked.status, 405);
+  assert.equal(clicked.headers.get('allow'), 'POST');
+  assert.match((await clicked.json()).howTo, /curl -X POST https:\/\/example\.test\/v1\/agents/);
+  assert.equal((await get('/mcp')).status, 405);
+  // HEAD 按 GET 路由（探活脚本常用），且不返回 body
+  const head = await fetch(host.url + '/health', { method: 'HEAD' });
+  assert.equal(head.status, 200);
+  assert.equal(await head.text(), '');
+  assert.equal((await fetch(host.url + '/', { method: 'HEAD' })).status, 200);
+});
