@@ -14,3 +14,14 @@
 | 公开交付统计 | 成功交付 75 · live 占比 68.4% · 退款 3（{"EMPTY_DELIVERY":1,"FALLBACK_NOT_CHARGED":2}）· 时延 p50/p95=7986/43121ms |
 | 回滚 | `npx vercel rollback` |
 
+## 2026-09-13 06:45 · 对齐 HEAD：CI 门禁 + 部署台账 + 验收分桶
+
+| 项 | 值 |
+| --- | --- |
+| git | `dff484b` (main) — ci: README 挂 Verify 徽章并记录首次运行结果（success / 62s / Node 22.9） |
+| 地址 | https://starhall-a2a.vercel.app |
+| health | http=200 status=ok store=postgres dbReady=true writeConflicts=0 round=BEFORE |
+| readiness | http=200 ready=true state=ready |
+| 公开交付统计 | 成功交付 75 · live 占比 68.4% · 退款 3（{"EMPTY_DELIVERY":1,"FALLBACK_NOT_CHARGED":2}）· 时延 p50/p95=7986/43121ms |
+| 回滚 | `npx vercel rollback` |
+
