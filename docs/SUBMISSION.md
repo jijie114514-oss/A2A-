@@ -134,13 +134,33 @@
 
 ### 已知行为与限制（同一次验收发现的，如实记录）
 
-1. **约 5% 的交付会落到「备用作品」**（37 单里 2 单，都在 sales-pitch）。原因是模型没能在正文里实际使用输入的产品名/价格，机器校验连续两次不通过，于是交付明确标记的本地模板：试用单不扣分，付费单按目录价收费并在 `generation.mode=fallback` 里写明。这是设计内行为（宁可给带标记的模板，也不编造内容），但如果对方的输入很含糊（例如产品名写成"自检"），更容易触发。
+1. ~~约 5% 的交付会落到「备用作品」，原因是模型没用到输入的产品名/价格~~ —— **这条结论已被推翻（2026-09-13 凌晨修正）**：实测是我们自己的校验器过严，把合法输出当成了错误。模型当时写的是「仅需9本地积分」「MCP自检」，而校验器只认「9 积分/credits」并要求产品名逐字包含（含空格）。已修复，同一输入现在 `generation=live`、`attempts=1`。详见 `test/sales-validation.test.js`（用真实模型逐字输出作 fixture）。
+   备用交付（`generation.mode=fallback`）路径本身仍然保留：模型真的失败时交付带标记的本地模板，试用不扣分、付费按目录价并在回执里写明原因。
 2. **备用交付不会自动退款**——目录的 `deliveryPolicy.fallbackCharged=true` 已公开写明。客观失败（空交付、结构缺失、违反预算）才机器自动退款。
 3. **订单硬预算 115 秒**：超时判失败且不扣分，可用新幂等键重试；这与赛事 5 分钟上限保持余量。
 4. **积分是模拟账本**：真实比赛积分在 SharedNet 房间结算，不经过本 API（`catalog.round.payment` 里写明）。
 5. **Neon 免费版 5 分钟无活动缩容**：赛前 20:40 先打两次 `/health` 预热。
 
-## 九、待办
+## 九、广告系统对照（2026-09-13 核查，线上实测）
+
+对照 `未来计划-广告位功能.md`（旧方案）与 `docs/COMMERCIAL-API.md`（现行契约）：**三档广告全部实现，线上跑通**。
+
+| 旧方案（广告位功能） | 现行实现 | 状态 |
+| --- | --- | --- |
+| 随单展示位 8 分 / 10 次展示 | `star-sponsorship` plan `delivery` **5 分**，10 次（试用 2 次） | ✅ 价格随赛前市场带下调 |
+| 人气榜置顶位 15 分 / 30 分钟 | plan `leaderboard` **10 分** / 30 分钟 | ✅ |
+| 表演冠名 20 分 / 30 分钟 | plan `featured` **15 分** / 30 分钟，`placement=featured-naming` | ✅ 呈现方式见下行 |
+| 「作品开头带冠名」 | 新赞助**不改写作品正文**，以 `delivery.compactMarketBoard.sponsors` 条目交付（adId/starId/placement/advertiser/adCopy/impressionId）；旧未绑定明星的 `ad-sponsor` 才保留正文冠名前缀 | ⚠️ 契约变更，已写在 COMMERCIAL-API.md:82 |
+| 可核验曝光 | 每次曝光写入 `state.impressions`（`evidenceClass: OBSERVED`），买家 `GET /v1/ads/:id` 可核账，`impressionId` 与交付回执一一对应 | ✅ 线下实测对得上 |
+| 试用广告 0 元、缩限（2 次 / 5 分钟） | `displaysMax=2`、`expiresAt=+5min`、`kind='trial'` | ✅ |
+| 广告不污染明星粉丝支持/记忆 | 赞助单 `wallEntry.stars=[]`、`allocations={}`（实测） | ✅ |
+| 新赞助要绑定明星并计 Sponsor Support | 权重 0.6：5 分投放 → 支持分 3.0，`activeSponsors=1`、压力 `LOW`（实测） | ✅ 超出旧方案的升级 |
+| 无投放时榜上为空、不虚构 | `summary.ads.pinned=[]`，文案明说不展示虚构广告 | ✅ |
+| 未曝光可退、已曝光拒退 | 实测：已产生曝光 → `DECLINED / IMPRESSIONS_ALREADY_SERVED` | ✅ |
+
+复现：`node scripts/agent-acceptance.js <url>`（含赞助购买与曝光计数）+ `test/ads.test.js`（5 个用例）。
+
+## 十、待办
 
 - [x] ~~建公开 GitHub 仓库~~（https://github.com/jijie114514-oss/A2A-，`.gitignore` 已挡 `.env` 与 `data/`）
 - [x] ~~部署到公网~~（https://starhall-a2a.vercel.app，Vercel + Neon，见上表与 `docs/DEPLOY-VERCEL-REFACTOR.md`）
