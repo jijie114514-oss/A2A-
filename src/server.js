@@ -89,6 +89,21 @@ export function createHandler(app, options) {
         await transport.handleRequest(req, res, body);
         return;
       }
+      // 就绪端点：只回答「现在能不能接单」，不回答「交付质量」。
+      // 借鉴 ZAAT 的做法：端口在听/健康通过 ≠ 客户端或体验已经验收，所以把这句话写进响应。
+      if (method === 'GET' && (url.pathname === '/readiness' || url.pathname === '/ready')) {
+        const dbReady = await app.store.probe();
+        const checks = {
+          store: { ok: Boolean(dbReady), driver: app.store.store, writeConflicts: app.store.writeConflicts ?? 0 },
+          model: { ok: options.llm.provider !== 'mock', provider: options.llm.provider, model: options.llm.model || null, fallbackEnabled: Boolean(options.llm.fallback) },
+          registration: { ok: Boolean(options.openRegistration), path: '/v1/agents' },
+          bookkeeping: { ok: !app.bridge.auditFailed && !app.projectionFailed, auditFailed: Boolean(app.bridge.auditFailed), projectionFailed: Boolean(app.projectionFailed) },
+        };
+        const ready = Object.values(checks).every(check => check.ok);
+        return send(ready ? 200 : 503, { ready, state: ready ? 'ready' : 'degraded', mode: options.mode, round: app.catalog().round.id,
+          checks, asOf: new Date().toISOString(),
+          scope: '就绪只表示可以接单。交付质量请看 GET /v1/evidence（成功率、时延分位、退款与失败原因），不要把「服务在听」当成「交付合格」。' });
+      }
       if (method === 'GET' && url.pathname === '/health') {
         const dbReady = await app.store.probe();
         return send(200, { status: app.bridge.auditFailed || app.projectionFailed || !dbReady ? 'degraded' : 'ok', product: 'StarHall', version: VERSION,
