@@ -25,3 +25,14 @@
 | 公开交付统计 | 成功交付 75 · live 占比 68.4% · 退款 3（{"EMPTY_DELIVERY":1,"FALLBACK_NOT_CHARGED":2}）· 时延 p50/p95=7986/43121ms |
 | 回滚 | `npx vercel rollback` |
 
+## 2026-09-13 07:11 · 事故恢复：切换 Neon 项目 + 移除 fullWall + 读 TTL + 降级
+
+| 项 | 值 |
+| --- | --- |
+| git | `769184f` (main) — fix: Neon 配额事故 —— 订单不再内嵌墙快照 + 读路径 TTL + 数据库挂掉时降级而非整站 500 |
+| 地址 | https://starhall-a2a.vercel.app |
+| health | http=200 status=ok store=postgres dbReady=true writeConflicts=2 round=BEFORE |
+| readiness | http=200 ready=true state=ready |
+| 公开交付统计 | 成功交付 8 · live 占比 50% · 退款 0（{}）· 时延 p50/p95=613/7665ms |
+| 回滚 | `npx vercel rollback` |
+
