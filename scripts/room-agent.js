@@ -34,15 +34,18 @@ const out = t => { if (!quiet) console.log(t); };
 
 let payload; try { payload = JSON.parse(readFileSync(0, 'utf8') || '{}'); } catch { payload = {}; }
 const SEAT = payload.member_id || process.env.SHAREDNET_MEMBER_ID || '';
-const incoming = (payload.messages || []).filter(m => m?.content && m.sender_instance_id !== SEAT);
-if (!incoming.length) { out('（没有需要回复的新消息）'); process.exit(0); }
 
 // 只回应「点名我们」的消息：房间里有大量别队互评、广告和对其他卖方的问答，逐条回复会刷屏、答非所问，
 // 还会烧掉每小时配额（2026-09-13 进场实测：24 条回复里 22 条并未点名 StarHall）。
-// 点名 = 提到产品名/榜单/我们的 seat，或这条消息是对我们自己消息的回复（若 payload 带了我们自己的消息）。
-const OUR_TEXT = new RegExp('starhall|星辉|star hall|market-?board|行情榜|sales pitch|stress test|deal coach|commercial diagnostic' + (SEAT ? `|${SEAT}` : ''), 'i');
-const ownIds = new Set((payload.messages || []).filter(m => m.sender_instance_id === SEAT).map(m => m.id));
+// 点名 = 提到产品名/榜单/我们的 seat，或这条消息是对我们自己消息的回复。
+const state0 = (() => { try { return JSON.parse(readFileSync(path.resolve('artifacts/room-agent-state.json'), 'utf8')); } catch { return {}; } })();
+const ownIds = new Set(state0.lastMessageIds || []);
+const OUR_TEXT = new RegExp('starhall|星辉|star ?hall|market-?board|行情榜|sales pitch|stress test|deal coach|commercial diagnostic' + (SEAT ? `|${SEAT}` : ''), 'i');
 const addressedToUs = m => OUR_TEXT.test(String(m.content || '')) || (m.reply_to_message_id && ownIds.has(m.reply_to_message_id));
+const incoming = (payload.messages || []).filter(m => m?.content && m.sender_instance_id !== SEAT && addressedToUs(m));
+const ignored = (payload.messages || []).filter(m => m?.content && m.sender_instance_id !== SEAT && !addressedToUs(m));
+if (ignored.length && !quiet) out(`（跳过未点名消息 ${ignored.length} 条）`);
+if (!incoming.length) { out('（没有需要回复的新消息）'); process.exit(0); }
 
 // ── FACTS：只读产品公开端点，60 秒缓存 ───────────────────────────────────────
 const cache = globalThis.__roomAgentCache ||= {};
@@ -140,6 +143,10 @@ const persist = () => { try { mkdirSync(path.dirname(stateFile), { recursive: tr
 const say = text => {
   if (dry) { out(`[dry] ${text}`); return { ok: true, dry: true }; }
   const r = spawnSync('npx', ['-y', 'sharednet@latest', 'say', text], { encoding: 'utf8', timeout: 60000 });
+  if (r.status === 0) {
+    const id = (r.stdout || '').match(/"id"\s*:\s*"(msg_[A-Za-z0-9]+)"/)?.[1];
+    if (id) { state.lastMessageIds = [...(state.lastMessageIds || []).filter(x => x !== id), id].slice(-20); persist(); }
+  }
   return { ok: r.status === 0, err: (r.stderr || '').slice(0, 200) };
 };
 
