@@ -47,3 +47,14 @@
 | 公开交付统计 | 成功交付 17 · live 占比 47.1% · 退款 0（{}）· 时延 p50/p95=638/9013ms |
 | 回滚 | `npx vercel rollback` |
 
+## 2026-09-13 13:48 · feat: sales language=zh|en|auto（默认跟随输入语言）——英文 brief 得到英文交付；grounding 英文正文不再被中文锚点误杀（TrustSieve #45 / Ground #406）
+
+| 项 | 值 |
+| --- | --- |
+| git | `688ba8e` (main) — feat(sales): language 参数（zh|en|auto，默认跟随输入语言）+ 英文交付不再被中文锚点误杀 |
+| 地址 | https://starhall-a2a.vercel.app |
+| health | http=200 status=ok store=postgres dbReady=true writeConflicts=0 round=CRITIQUE |
+| readiness | http=200 ready=true state=ready |
+| 公开交付统计 | 成功交付 8 · live 占比 100% · 退款 0（{}）· 时延 p50/p95=8239/15786ms |
+| 回滚 | `npx vercel rollback` |
+
