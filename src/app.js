@@ -6,7 +6,7 @@ import { STARS, SERVICES, getService, validateInput, catalog } from './catalog.j
 import { DELIVERY_BUDGET_SECONDS } from './limits.js';
 import { ensure, string, object, AppError } from './errors.js';
 import { SPONSOR_PLANS } from './commercial-catalog.js';
-import { marketBoard, recordMarketMove, recordRefundMove, compactBoard, boardResponse, campaignStats, activeAd, recordLegacyImpression, eligiblePaid } from './market.js';
+import { marketBoard, recordMarketMove, recordRefundMove, compactBoard, boardResponse, campaignStats, activeAd, recordLegacyImpression, eligiblePaid, MARKET_DEFAULTS } from './market.js';
 import { recordSignals, commercialProfile, diagnostic, recommendedNextAction } from './signals.js';
 import { verifyDelivery, REFUND_REASONS } from './verification.js';
 import { serviceGenerationHealth } from './health.js';
@@ -46,7 +46,7 @@ export class StarHall {
       if (s.ad) {
         const recent = orders.filter(o => o.status !== 'pending' && o.service === s.id).slice(-20);
         const counts = { sampled: recent.length, delivered: recent.filter(o => o.status === 'delivered').length, failed: recent.filter(o => o.status === 'failed').length };
-        return { ...s, health: { status: this.bridge.auditFailed ? 'unavailable' : counts.failed ? 'degraded' : counts.delivered ? 'observed_instant' : 'unverified', ...counts, instant: true, note: '广告位购买不调用模型，确认即生效；展示次数在 GET /v1/ads 可查', lastCompletedAt: recent.at(-1)?.completedAt || null } };
+        return { ...s, health: { status: this.bridge.auditFailed ? 'unavailable' : counts.failed ? 'degraded' : counts.delivered ? 'observed_instant' : 'unverified', ...counts, instant: true, note: '广告位购买不调用模型，确认即生效；去重后的独立认证触达在 GET /v1/ads 可查', lastCompletedAt: recent.at(-1)?.completedAt || null } };
       }
       const recent = orders.filter(o => o.status !== 'pending' && (o.service === s.id || o.delivery?.pieces.some(p => p.service === s.id))).slice(-20);
       const counts = { sampled: recent.length, liveDelivered: 0, fallbackDelivered: 0, mockDelivered: 0, failed: 0 };
@@ -115,6 +115,7 @@ export class StarHall {
       ensure(!k.auditFailed, 'audit_unavailable', '审计写入不可用，暂停新交易', 503);
       return this.store.transaction(state => {
         signal.throwIfAborted();
+        this.reconcileExpiredAds(state, ctx.traceId);
         const order = state.orders.find(o => o.id === args.orderId);
         ensure(order && order.status === 'pending', 'invalid_order', '订单不存在或已经结束', 409);
         const s = getService(order.service);
@@ -128,10 +129,11 @@ export class StarHall {
           ensure(account.balance >= order.price, 'insufficient_balance', '余额不足', 402);
           const completedAt = now();
           const trial = order.kind === 'trial';
+          const windowMinutes = trial ? 5 : (plan?.minutes ?? (tier === 'ad-spot' ? { ...MARKET_DEFAULTS, ...state.marketSettings }.deliveryAdMinutes : 30));
           const ad = { id: randomUUID(), orderId: order.id, buyerId: account.id, buyerName: account.name, tier, text: args.pieces[0].text,
             ...(plan ? { starId: order.input.starId, plan: order.input.plan, placement: plan.placement, advertiser: order.input.advertiser } : {}),
             status: 'active', displays: 0, displaysMax: tier === 'ad-spot' ? (trial ? 2 : 10) : null,
-            expiresAt: tier === 'ad-spot' ? null : new Date(Date.now() + (trial ? 5 : 30) * 60000).toISOString(),
+            expiresAt: new Date(Date.now() + windowMinutes * 60000).toISOString(),
             kind: trial ? 'trial' : 'paid', createdAt: completedAt, lastDisplayAt: null };
           state.ads.push(ad);
           const wallEntry = { id: order.id, buyerId: account.id, buyerName: account.name, stars: [], amount: order.price, kind: order.kind || 'paid', service: s.id, serviceName: s.name, message: order.message,
@@ -172,7 +174,7 @@ export class StarHall {
         const delivery = { pieces: args.pieces, shoutout: `${account.name} · ${order.kind === 'trial' ? '免费试用' : `${order.price}分`} · ${s.name}`, wallEntry,
           summary: summaryOf(state), simulatedPayment: true };
         const displayable = state.ads.filter(a => !a.starId && activeAd(state, a) && (a.tier === 'ad-spot' || a.tier === 'ad-sponsor'));
-        for (const ad of displayable) recordLegacyImpression(state, ad, `order:${order.id}`, 'PASSIVE', 'legacy-delivery');
+        for (const ad of displayable) recordLegacyImpression(state, ad, `order:${order.id}`, 'PASSIVE', 'legacy-delivery', order.buyerId);
         const sponsors = displayable.filter(a => a.tier === 'ad-sponsor');
         if (sponsors.length && !s.commercial) {
           const prefix = `【本作品由${sponsors.map(a => a.buyerName).join('、')}冠名呈现】\n`;
@@ -199,25 +201,27 @@ export class StarHall {
         return order;
       });
     });
-    k.register('summary', 'ledger/summary', 'invoke', async (ctx, _args, signal) => k.turn('ledger', ctx.actor.agentId, 'summary', ctx.traceId, async function* () {
+    k.register('summary', 'ledger/summary', 'invoke', async (ctx, args = {}, signal) => k.turn('ledger', ctx.actor.agentId, 'summary', ctx.traceId, async function* () {
       yield { tool: 'summary_storage' };
-      return yield { tool: 'summary_present' };
+      return yield { tool: 'summary_present', args: { viewer: ctx.actor.agentId, countImpressions: args.countImpressions !== false } };
     }, signal));
     k.register('summary_storage', 'ledger/storage-summary', 'read', async () => summaryOf(this.store.read()));
-    k.register('summary_present', 'ledger/storage-summary-exposure', 'write', async (_ctx, _args, signal) => this.store.transaction(state => {
+    k.register('summary_present', 'ledger/storage-summary-exposure', 'write', async (ctx, args = {}, signal) => this.store.transaction(state => {
       signal.throwIfAborted(); ensure(!k.auditFailed, 'audit_unavailable', '审计不可用', 503);
-      return this.presentSummary(state, `summary:${randomUUID()}`, 'ACTIVE');
+      this.reconcileExpiredAds(state, ctx.traceId);
+      return this.presentSummary(state, `summary:${randomUUID()}`, 'ACTIVE', undefined, args.viewer || 'public', args.countImpressions !== false);
     }));
     k.register('market_board', 'ledger/market-board', 'invoke', async (ctx, args, signal) => {
-      object(args, ['key']);
+      object(args, ['key', 'countImpressions']);
       if (args.key !== undefined) string(args.key, 'Idempotency-Key', 128);
       return k.turn('ledger', ctx.actor.agentId, 'market-board-read', ctx.traceId, async function* () {
-        return yield { tool: 'market_board_storage', args: { actorId: ctx.actor.agentId, ...(args.key ? { key: args.key } : {}) } };
+        return yield { tool: 'market_board_storage', args: { actorId: ctx.actor.agentId, ...(args.key ? { key: args.key } : {}), countImpressions: args.countImpressions !== false } };
       }, signal);
     });
-    k.register('market_board_storage', 'ledger/storage-market-board', 'write', async (_ctx, args, signal) => this.store.transaction(state => {
+    k.register('market_board_storage', 'ledger/storage-market-board', 'write', async (ctx, args, signal) => this.store.transaction(state => {
       signal.throwIfAborted(); ensure(!k.auditFailed, 'audit_unavailable', '审计不可用', 503);
-      return boardResponse(state, args.actorId, args.key);
+      this.reconcileExpiredAds(state, ctx.traceId);
+      return boardResponse(state, args.actorId, args.key, { countImpressions: args.countImpressions !== false });
     }));
     k.register('commercial_profile', 'ledger/commercial-profile', 'invoke', async (ctx, args, signal) => {
       object(args, []);
@@ -251,7 +255,7 @@ export class StarHall {
       signal.throwIfAborted();
       const entry = { id: randomUUID(), kind: 'demo', buyerId: 'broker', buyerName: 'StarHall 经纪人（自家演示）', stars: ['star-a'], amount: 0,
         service: 'poem', serviceName: '星A免费演示', message: '', displayMessage: '经纪人完成星A演示，非外部买家消费', messageSource: 'system', allocations: { 'star-a': 0 }, pinned: false, createdAt: now() };
-      state.wall.push(entry); return { ...entry, compactMarketBoard: compactBoard(state, `demo:${entry.id}`, ['star-a']), recommendedNextAction: { action: 'show-market-board', path: '/v1/market-board', price: 0 } };
+      state.wall.push(entry); return { ...entry, compactMarketBoard: compactBoard(state, `demo:${entry.id}`, ['star-a'], null, 'broker'), recommendedNextAction: { action: 'show-market-board', path: '/v1/market-board', price: 0 } };
     }));
     k.register('broker_escalation', 'broker/escalation', 'invoke', async (ctx, args, signal) => k.turn('broker', ctx.actor.agentId, 'escalation-review', ctx.traceId, async function* () { return yield { tool: 'broker_review', args }; }, signal));
     k.register('broker_review', 'broker/review', 'invoke', async (ctx, args) => {
@@ -275,8 +279,8 @@ export class StarHall {
     delete order.delivery.fullWall;
     recordSignals(state, order);
     recordMarketMove(state, order, before);
-    order.delivery.compactMarketBoard = compactBoard(state, `order:${order.id}`, order.delivery.pieces.filter(p => p.star !== 'ledger').map(p => p.star), order.delivery.ad?.id);
-    order.delivery.summary = this.presentSummary(state, `order:${order.id}`, 'PASSIVE', order.delivery.ad?.id);
+    order.delivery.compactMarketBoard = compactBoard(state, `order:${order.id}`, order.delivery.pieces.filter(p => p.star !== 'ledger').map(p => p.star), order.delivery.ad?.id, order.buyerId);
+    order.delivery.summary = this.presentSummary(state, `order:${order.id}`, 'PASSIVE', order.delivery.ad?.id, order.buyerId);
     order.delivery.recommendedNextAction = recommendedNextAction(state, order.buyerId);
     order.delivery.commercialSignalIds = state.commercialSignals.filter(s => s.orderId === order.id).map(s => s.id);
   }
@@ -310,15 +314,27 @@ export class StarHall {
       order.delivery.commercialSignalIds = [...(order.delivery.commercialSignalIds || []), `${order.id}:refund`];
     }
     // Keep the stored receipt honest: snapshots must not show rolled-back support as current.
-    order.delivery.compactMarketBoard = compactBoard(state, `order:${order.id}:refund`, order.delivery.pieces.filter(p => p.star !== 'ledger').map(p => p.star), order.delivery.ad?.id);
-    order.delivery.summary = this.presentSummary(state, `order:${order.id}:refund`, 'PASSIVE', order.delivery.ad?.id);
+    order.delivery.compactMarketBoard = compactBoard(state, `order:${order.id}:refund`, order.delivery.pieces.filter(p => p.star !== 'ledger').map(p => p.star), order.delivery.ad?.id, order.buyerId);
+    order.delivery.summary = this.presentSummary(state, `order:${order.id}:refund`, 'PASSIVE', order.delivery.ad?.id, order.buyerId);
     order.delivery.recommendedNextAction = recommendedNextAction(state, order.buyerId);
     recordRefundMove(state, order, refundReason, beforeBoard);
     state.events.push({ type: 'order.refunded', orderId: order.id, traceId, at: refundedAt, refundReason, source });
     return true;
   }
-  presentSummary(state, surfaceId, traffic, skipAdId) {
-    for (const ad of state.ads.filter(a => !a.starId && a.id !== skipAdId && a.tier === 'ad-pin' && activeAd(state, a))) recordLegacyImpression(state, ad, surfaceId, traffic, 'legacy-summary');
+  /** 按曝光计费的活动到期仍未达到承诺触达 → 机器自动退款，由榜单/摘要/下单等写事务惰性触发（无定时器）。 */
+  reconcileExpiredAds(state, traceId) {
+    const refunded = [];
+    for (const ad of state.ads || []) {
+      if (ad.status !== 'active' || ad.kind !== 'paid' || !ad.displaysMax || !ad.expiresAt) continue;
+      if (Date.parse(ad.expiresAt) > Date.now() || (ad.displays || 0) >= ad.displaysMax) continue;
+      const order = state.orders.find(o => o.id === ad.orderId);
+      if (!order || order.status !== 'delivered') continue;
+      if (this.applyRefund(state, order, 'IMPRESSIONS_NOT_DELIVERED', 'automatic', null, traceId)) refunded.push(ad.id);
+    }
+    return refunded;
+  }
+  presentSummary(state, surfaceId, traffic, skipAdId, viewer = 'public', countImpressions = true) {
+    if (countImpressions) for (const ad of state.ads.filter(a => !a.starId && a.id !== skipAdId && a.tier === 'ad-pin' && activeAd(state, a))) recordLegacyImpression(state, ad, surfaceId, traffic, 'legacy-summary', viewer);
     const summary = summaryOf(state);
     summary.ads.pinned = summary.ads.pinned.filter(a => a.id !== skipAdId);
     return summary;
@@ -449,8 +465,14 @@ export class StarHall {
       }
       if (current.delivery?.ad) {
         const ad = state.ads.find(a => a.id === current.delivery.ad.id);
-        const impressions = ad?.displays || 0;
-        if (impressions > 0) return { decision: 'DECLINED', declineCode: 'IMPRESSIONS_ALREADY_SERVED' };
+        const verified = ad?.displays || 0;
+        const expired = Boolean(ad?.expiresAt) && Date.parse(ad.expiresAt) <= Date.now();
+        // 按曝光计费的活动：窗口结束仍未达到承诺触达 → 未达标自动退（机器判定，不依赖人工）。
+        if (ad && expired && ad.displaysMax && verified < ad.displaysMax) {
+          this.applyRefund(state, current, 'IMPRESSIONS_NOT_DELIVERED', 'buyer-request', reason);
+          return { decision: 'REFUNDED' };
+        }
+        if (verified > 0) return { decision: 'DECLINED', declineCode: 'IMPRESSIONS_ALREADY_SERVED' };
         if (!ad || ad.status !== 'active' || !activeAd(state, ad)) {
           this.applyRefund(state, current, 'ADVERTISEMENT_ACTIVATION_FAILED', 'buyer-request', reason);
           return { decision: 'REFUNDED' };
@@ -534,8 +556,8 @@ export class StarHall {
     const order = this.store.read().orders.find(o => o.buyerId === actor.id && o.key === key && (o.kind === 'trial') === trial);
     ensure(order, 'not_found', '此身份下没有对应幂等键的订单', 404); return this.publicOrder(order);
   }
-  summary(actor = { id: 'public' }) { return this.bridge.call(actor.id, 'summary', 'summary'); }
-  marketBoard(actor = { id: 'public' }, key) { return this.bridge.call(actor.id, 'market-board-read', 'market_board', key === undefined ? {} : { key }); }
+  summary(actor = { id: 'public' }, { countImpressions = true } = {}) { return this.bridge.call(actor.id, 'summary', 'summary', { countImpressions }); }
+  marketBoard(actor = { id: 'public' }, key, { countImpressions = true } = {}) { return this.bridge.call(actor.id, 'market-board-read', 'market_board', { ...(key === undefined ? {} : { key }), countImpressions }); }
   commercialProfile(actor) { return this.bridge.call(actor.id, 'commercial-analysis-read', 'commercial_profile'); }
   salesPitchHealth({ window = 10, testRunId = null } = {}) {
     const windowN = Math.min(Math.max(Number(window) || 10, 1), 100);
@@ -544,7 +566,8 @@ export class StarHall {
   wall(actor) { return this.bridge.call(actor.id, 'full-wall', 'wall'); }
   ads(actor) {
     const ads = (this.store.read().ads || []).filter(a => a.buyerId === actor.id);
-    return { buyerId: actor.id, ads: ads.map(a => campaignStats(this.store.read(), a)), note: 'currentImpressions为实际附入响应/交付的计数，不代表阅读或转化；旧版历史计数可能没有逐条曝光事件。' };
+    return { buyerId: actor.id, ads: ads.map(a => campaignStats(this.store.read(), a)),
+      note: 'currentImpressions = 去重后的独立认证买家触达（同一 buyerId 在一个 campaign 内只计 1 次）；self/platform/anonymous 在 inclusions、impressionsByClass、uniqueViewers 里单列。曝光只证明广告被附进已提交响应，不代表阅读或转化；旧版历史计数可能没有逐条曝光事件或分类。' };
   }
   adById(actor, id) {
     const a = (this.store.read().ads || []).find(a => a.id === id && a.buyerId === actor.id);
@@ -574,7 +597,7 @@ export class StarHall {
       return await this.store.transaction(state => {
         const session = state.practice.find(s => s.id === id);
         const turn = { round: session.turns.length + 1, message, response, key,
-          compactMarketBoard: compactBoard(state, `practice:${id}:${session.turns.length + 1}`, ['star-c']), recommendedNextAction: recommendedNextAction(state, actor.id) };
+          compactMarketBoard: compactBoard(state, `practice:${id}:${session.turns.length + 1}`, ['star-c'], null, actor.id), recommendedNextAction: recommendedNextAction(state, actor.id) };
         session.turns.push(turn); session.busy = false; return publicPractice(turn);
       });
     } catch (e) { await this.store.transaction(state => { state.practice.find(s => s.id === id).busy = false; }); throw e; }

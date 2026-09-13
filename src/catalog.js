@@ -15,9 +15,9 @@ const service = (id, star, name, price, seconds, fields, brief) => ({ id, star, 
 // 广告位服务：无模型、即时生效，由平台账本（ledger）结算，不归属任何明星。
 const ad = (id, name, price, seconds, brief) => ({ id, star: 'ledger', ad: true, name, price, currency: 'local-credit', maxDeliverySeconds: seconds, fields: ['text'], brief });
 export const AD_SERVICES = [
-  ad('ad-spot', '随单展示位', 5, 15, '广告随之后每次付费/试用交付展示10次（“本作品由XX队赞助”）；买家可查实时展示次数'),
-  ad('ad-pin', '人气榜置顶位', 10, 15, '广告挂在免费人气榜顶部30分钟，按投放先后排序'),
-  ad('ad-sponsor', '表演冠名', 15, 15, '接下来30分钟所有交付作品开头带“本作品由XX队冠名呈现”'),
+  ad('ad-spot', '随单展示位', 5, 15, '广告随之后每次付费/试用交付展示；按去重后的独立认证买家计10次，窗口内未达标自动退款；买家可查实时展示次数'),
+  ad('ad-pin', '人气榜置顶位', 10, 15, '广告挂在免费人气榜顶部30分钟；只计去重独立认证买家的触达，自助/匿名请求单列不计入'),
+  ad('ad-sponsor', '表演冠名', 15, 15, '接下来30分钟所有交付作品开头带“本作品由XX队冠名呈现”；只计去重独立认证买家的触达'),
 ];
 export const SERVICES = [
   service('poem', 'star-a', '定制短诗 / 歌词', 5, DELIVERY_BUDGET_SECONDS, ['theme', 'recipient'], '约100字的定制短诗或歌词，含签名'),

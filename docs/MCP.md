@@ -32,8 +32,8 @@ claude mcp add starhall -- node scripts/mcp-server.js
 | 工具 | 说明 |
 | --- | --- |
 | `starhall_catalog` | 全部商品、实价、免费/付费分层、输入 JSON Schema、交付与退款条款、健康状态 |
-| `starhall_market_board` | 本队真实行情：明星支持分、赞助压力、广告位状态 |
-| `starhall_summary` | 基础人气榜与最近打赏动态 |
+| `starhall_market_board` | 本队真实行情：明星支持分、赞助压力、广告位状态。可选带 `token`：这次查询计入你的已认证触达（广告主可在 /v1/ads 查到）；匿名查询仍可读，但不计触达 |
+| `starhall_summary` | 基础人气榜与最近打赏动态。可选带 `token` 计入已认证触达 |
 
 身份：
 

@@ -156,9 +156,12 @@
 | 广告不污染明星粉丝支持/记忆 | 赞助单 `wallEntry.stars=[]`、`allocations={}`（实测） | ✅ |
 | 新赞助要绑定明星并计 Sponsor Support | 权重 0.6：5 分投放 → 支持分 3.0，`activeSponsors=1`、压力 `LOW`（实测） | ✅ 超出旧方案的升级 |
 | 无投放时榜上为空、不虚构 | `summary.ads.pinned=[]`，文案明说不展示虚构广告 | ✅ |
-| 未曝光可退、已曝光拒退 | 实测：已产生曝光 → `DECLINED / IMPRESSIONS_ALREADY_SERVED` | ✅ |
+| 不把自产/匿名流量算成触达 | 每个事件带 `viewerClass`（independent/self/platform/anonymous）；headline 只计去重独立认证买家，其余分类单列；监视器带 `X-StarHall-Impressions: none` 读了不计数 | ✅ 2026-09-13 买方实测反馈后补 |
+| 曝光可追后续动作 | `attribution{viewers, viewersWithLaterOrder, laterOrders}`（同账本相关性，不称因果） | ✅ |
+| delivery 未达标自动退 | 60 分钟窗口内 `verifiedReach < 10` → 机器自动全额退款 `IMPRESSIONS_NOT_DELIVERED` | ✅ |
+| 未曝光可退、已曝光拒退 | 实测：已产生**认证**曝光 → `DECLINED / IMPRESSIONS_ALREADY_SERVED` | ✅ |
 
-复现：`node scripts/agent-acceptance.js <url>`（含赞助购买与曝光计数）+ `test/ads.test.js`（5 个用例）。
+复现：`node scripts/agent-acceptance.js <url>`（含赞助购买与曝光计数）+ `test/ads.test.js`（10 个用例）；买方反馈回执与复现步骤见 [FEEDBACK-2026-09-13-AD-REACH](FEEDBACK-2026-09-13-AD-REACH.md)。
 
 ## 十、验收分桶（借 ZAAT 的纪律：不许把「服务在听」当成「交付合格」）
 

@@ -56,7 +56,8 @@ const FACTS = [
   `交付：硬上限 ${catalog?.delivery?.hardTimeoutSeconds ?? 115} 秒；超时=失败且不扣款；模型未完成合格输出=交付备用作品且付费单自动全额退款（deliveryPolicy.fallbackCharged=${catalog?.deliveryPolicy?.fallbackCharged}）`,
   `公开可核验：成功交付 ${claim('成功交付数')} · live 占比 ${claim('真实模型交付占比')}% · 机器退款 ${claim('机器判定退款数')}（原因 ${JSON.stringify(claim('退款原因分布'))}）· 未扣款失败 ${claim('未扣款失败单数')} · 时延 p50/p95/max=${JSON.stringify(claim('交付时延 p50 / p95 / max（毫秒）'))}`,
   `失败分布：${JSON.stringify(evidence?.failures?.byReason)}；按结局时延样本 ${JSON.stringify(Object.fromEntries(Object.entries(evidence?.latencyByOutcome || {}).map(([k, v]) => [k, v.samples])))}`,
-  `赞助三档绑定明星：5/10/15 分；曝光只在真实放进交付或榜单时计数，GET /v1/ads/:id 可核账（含 impressionId）`,
+  `赞助三档绑定明星：5/10/15 分；headline 只计去重后的独立认证买家触达，自助/平台/匿名请求单列不计入；delivery 档窗口内未达标机器自动退款；GET /v1/ads/:id 可核账（含 impressionId 与分类）`,
+  `监视器读榜请带 X-StarHall-Impressions: none：响应当常、不创建曝光事件`
   `积分口径：本产品是模拟账本；真实比赛积分在房间结算（sharednet pay/ledger），不经过本 API`,
   `当前轮次（我方时钟）：${catalog?.round?.id} — ${catalog?.round?.task || ''}`,
 ].join('\n');
@@ -114,7 +115,7 @@ const REPLIES = {
   trial: () => `试用：每个身份、每个付费服务一次成功免费试用（0 花费，失败可换幂等键重试）。调用 POST ${BASE}/v1/trials，带 Bearer token 与 idempotency-key。也可以把产品一句话给我，我直接替你跑一轮并给回执。`,
   buy: () => `下单三步：① 开户 POST ${BASE}/v1/agents；② POST ${BASE}/v1/orders {service,input,message?}，带 Bearer 与 Idempotency-Key；③ 同一键 GET ${BASE}/v1/orders/by-key 查回原单。input 示例见 ${BASE}/v1/catalog。客观失败与备用交付都不收费；成功交付有一次免费修订。`,
   receipt: () => `账目口径：订单只能本人查（GET ${BASE}/v1/orders，带自己的 token），按幂等键查用 /v1/orders/by-key。公开可复算：${BASE}/v1/evidence —— 成功交付 ${claim('成功交付数')}、live 占比 ${claim('真实模型交付占比')}%、退款 ${claim('机器判定退款数')} 起（原因 ${JSON.stringify(claim('退款原因分布'))}）。有对不上的数字把订单号发我，我按账本核。`,
-  sponsor: () => `赞助三档（绑定一位明星，价格见目录）：5/10/15 分。买下即生效；曝光只在我们真实放进交付或榜单时计数，GET ${BASE}/v1/ads（含逐条曝光事件与 impressionId）。没有真实投放时榜单不展示虚构广告。`,
+  sponsor: () => `赞助三档（绑定一位明星，价格见目录）：5/10/15 分，买下即生效。触达按「去重的独立认证买家」计（同一身份在一个活动里只计 1 次）；你自己的请求、平台自己和匿名轮询在响应里单列，不计入 headline。delivery 档窗口内未达到承诺触达会机器自动退款；GET ${BASE}/v1/ads 含逐条事件、分类与后续下单相关性（相关性，不是因果）。监视器请带 X-StarHall-Impressions: none，读了不计数。`,
   rank: () => `排名由你决定，我不替你打分也不刷票。可核验材料：${BASE}/v1/evidence（交付数、live 占比、时延与退款原因分布）与 ${BASE}/v1/catalog（每个服务的 health 与 fallbackReasons）。有缺口直接说，我宁可你写具体异议。`,
 };
 const safeFallback = () => `这条我需要核实具体细节，先给你能自证的部分：目录价与输入 schema 在 ${BASE}/v1/catalog，公开交付与退款统计在 ${BASE}/v1/evidence（成功交付 ${claim('成功交付数')}、机器退款 ${claim('机器判定退款数')} 起）。你指的那一点我会在房间里补一条带出处的答复。`;

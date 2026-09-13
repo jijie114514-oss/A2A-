@@ -36,11 +36,15 @@ try {
   const liveMarket = await app.marketBoard(other, 'final-board-visit');
   const tracking = app.adById(buyer, sponsorship.delivery.ad.id);
   const profile = await app.commercialProfile(buyer);
-  assert.equal(app.wallet(buyer).balance, 22);
-  assert.equal(tracking.currentImpressions, 4);
-  assert.equal(tracking.traffic.active, 2); assert.equal(tracking.traffic.passive, 2);
+  assert.equal(app.wallet(buyer).balance, 39); // 5+6+10+10+30 = 61 分（沿用当前目录实价）
+  // 触达按去重的独立认证买家计：本演练里只有 fan-lyra 一个独立买家看过（active 1，passive 0）。
+  assert.equal(tracking.currentImpressions, 1);
+  assert.equal(tracking.verifiedReach, 1);
+  assert.equal(tracking.traffic.active, 1); assert.equal(tracking.traffic.passive, 0);
+  assert.equal(tracking.uniqueViewers.independent, 1);
+  assert.ok(tracking.inclusions.total >= 3, '原始包含次数仍可审计，但不进 headline');
   assert.ok(passiveDelivery.delivery.compactMarketBoard.sponsors.some(s => s.adId === sponsorship.delivery.ad.id));
-  assert.equal(liveMarket.ranking.find(r => r.starId === 'star-b').sponsorSupport, 9);
+  assert.equal(liveMarket.ranking.find(r => r.starId === 'star-b').sponsorSupport, 6, 'leaderboard 10 分 × SPONSOR_SUPPORT_WEIGHT 0.6');
   const report = { version: '0.5.0-local', mode: 'local', liveRequested: live, generatedAt: new Date().toISOString(),
     note: 'Isolated local credits and real local ledger events. No external Arena sales or human ad reading are claimed.',
     catalog, opening, preMarket, trial, pitch, stress, deal, sponsorship, afterSponsorship, passiveDelivery,

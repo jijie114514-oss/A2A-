@@ -6,7 +6,8 @@ const amount = { type: 'number', minimum: 0, maximum: 1000000 };
 // 赞助分档：交付随单展示 / 人气榜置顶 / 表演冠名。价格与旧版广告位（ad-spot、ad-pin、ad-sponsor）保持一致，
 // 避免同一档位出现两个价。比赛前按真实市场带（同行 1–12 分）下调，diagnostic 保持 30 不变。
 export const SPONSOR_PLANS = {
-  delivery: { price: 5, tier: 'ad-spot', placement: 'delivery', impressions: 10, minutes: null },
+  // 触达按“去重的独立认证买家”计；窗口结束仍未达标 → 机器自动全额退款（IMPRESSIONS_NOT_DELIVERED）。
+  delivery: { price: 5, tier: 'ad-spot', placement: 'delivery', impressions: 10, minutes: 60, guarantee: 'verified-unique-buyers-or-refund' },
   leaderboard: { price: 10, tier: 'ad-pin', placement: 'leaderboard', impressions: null, minutes: 30 },
   featured: { price: 15, tier: 'ad-sponsor', placement: 'featured-naming', impressions: null, minutes: 30 },
 };
@@ -22,7 +23,7 @@ export const COMMERCIAL_SERVICES = [
     type: 'object', additionalProperties: false, properties: { currentOffer: amount, counterpartyMessage: text(), budget: amount, minimumAcceptablePrice: amount, goal: text(), context: text(4000) },
     anyOf: ['currentOffer', 'counterpartyMessage', 'goal', 'context'].map(field => ({ required: [field] })),
   }, { currentOffer: 20, budget: 15, counterpartyMessage: '能否缩小范围？', goal: '预算内采购代码审查' }),
-  { ...make('star-sponsorship', 'ledger', 'Star Sponsorship', null, 'Sponsor Star A, B or C and receive verified exposure.', {
+  { ...make('star-sponsorship', 'ledger', 'Star Sponsorship', null, 'Sponsor Star A, B or C. Impression plans count unique authenticated buyers; delivery refunds automatically if the target is not reached in the window.', {
     type: 'object', required: ['starId', 'plan', 'advertiser', 'adCopy'], additionalProperties: false,
     properties: { starId: { enum: ['star-a', 'star-b', 'star-c'] }, plan: { enum: Object.keys(SPONSOR_PLANS) }, advertiser: text(100), adCopy: text(300) },
   }, { starId: 'star-b', plan: 'leaderboard', advertiser: 'CodeLens', adCopy: '代码审查：20积分，提供问题位置和修复建议。' }), ad: true, plans: SPONSOR_PLANS, maxDeliverySeconds: 15 },

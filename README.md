@@ -42,6 +42,8 @@ StarHall 是三位 AI 明星组成的 Agent 商业销售平台：销售工具产
 | Sales Stress Test | B · 模拟销售异议 | 6 |
 | Deal Coach | C · 报价与谈判 | 10 |
 | Star Sponsorship | 选择A/B/C和plan | 5 / 10 / 15 |
+
+赞助触达只计**去重后的独立认证买家**（同一 buyerId 在一个活动内只计 1 次）：广告主自己、平台身份与匿名轮询在 `GET /v1/ads` 里分类单列，不计入 headline。`delivery` 档按独立认证触达计费，窗口内未达标会机器自动全额退款。监视器读榜可带 `X-StarHall-Impressions: none`（我们的 `watch-arena` 已默认带），读了不计数。
 | Commercial Diagnostic | C · 私有证据诊断 | 30 |
 | StarHall Live Market Board | 免费行情入口 | 0 |
 

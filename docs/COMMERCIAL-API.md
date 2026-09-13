@@ -41,14 +41,14 @@ Sales Pitch / Sales Stress Test 使用现有模型客户端、总45秒以内的�
 
 | 方法 / 路径 | 调用者 | 作用 |
 | --- | --- | --- |
-| GET /v1/market-board | 匿名、顾客、经纪人 | 免费公共榜；支持可选 Idempotency-Key 去重响应曝光 |
+| GET /v1/market-board | 匿名、顾客、经纪人 | 免费公共榜；支持可选 Idempotency-Key 去重响应曝光；带 `X-StarHall-Impressions: none` 时读了不计数 |
 | GET /v1/commercial-profile | 顾客本人 | 自己的信号、历史、广告与曝光；不接受 buyerId 或其他查询参数 |
 | GET /v1/catalog | 匿名 | 五商品＋免费榜；旧服务在 extras.services |
 | POST /v1/orders | 顾客 | 复用原入口，支持五个新service ID |
 | POST /v1/trials | 顾客 | 复用原试用入口，每身份每service一次成功免费试用 |
-| GET /v1/ads | 顾客本人 | campaign、currentImpressions、trackedImpressions、active/passive计数 |
-| GET /v1/ads/{id} | 广告所有者 | 同上，含逐条impression事件；其他身份404 |
-| GET /v1/summary | 匿名、顾客 | 旧结构保留；rank按新评分，旧版置顶广告查询现在累计曝光；经纪人仍403 |
+| GET /v1/ads | 顾客本人 | verifiedReach（去重独立认证买家）、trackedImpressions、inclusions/impressionsByClass/uniqueViewers、attribution、active/passive计数 |
+| GET /v1/ads/{id} | 广告所有者 | 同上，含逐条impression事件（viewer/viewerClass/counted）；其他身份404 |
+| GET /v1/summary | 匿名、顾客 | 旧结构保留；rank按新评分；匿名读不产生认证触达，`X-StarHall-Impressions: none` 不计数；经纪人仍403 |
 | GET /v1/orders?status=refunded | 订单所有者 | 查询机器退款后的订单；退款只能由确定性机器验证产生 |
 | POST /v1/orders/{id}/refund | 订单所有者 | 机器仲裁：客观失败/约束违反自动退款，主观不满意回绝+一次免费修订；幂等，审计每次请求 |
 | POST /v1/orders/{id}/revision | 订单所有者 | 每个成功 paid 内容订单一次免费修订（Idempotency-Key），不扣款不增销量不增明星支持 |
@@ -73,9 +73,9 @@ Sales Pitch / Sales Stress Test 使用现有模型客户端、总45秒以内的�
 
 | plan | 价格 | 场景 | 结束条件 | 免费试用 |
 | --- | ---: | --- | --- | --- |
-| delivery | 5 | 所选明星的后续作品、练习、演示 | 10次实际附入交付；未有流量不会虚增 | 2次 |
-| leaderboard | 10 | 主动完整榜 / 随单Compact Board | 30分钟 | 5分钟 |
-| featured | 15 | 所选明星交付及公共榜的赞助区 | 30分钟 | 5分钟 |
+| delivery | 5 | 所选明星的后续作品、练习、演示 | 计满 10 个**去重后的独立认证买家**触达；60 分钟窗口内未达标 → 机器自动全额退款（IMPRESSIONS_NOT_DELIVERED） | 2次 / 5分钟 |
+| leaderboard | 10 | 主动完整榜 / 随单Compact Board | 30分钟；只计独立认证买家触达 | 5分钟 |
+| featured | 15 | 所选明星交付及公共榜的赞助区 | 30分钟；只计独立认证买家触达 | 5分钟 |
 
 购买立即交付 ACTIVE 激活回执，不等待未来次数耗尽。`delivery.sponsorship` 返回 adId、starId、placement、startedAt、expiresAt、currentImpressions=0、trackingEndpoint。初始回执是不可变快照；实时信息查 trackingEndpoint。`ads`兼容字段中的status保持原小写 active/fulfilled/expired；赞助激活回执使用大写ACTIVE。
 
@@ -97,19 +97,40 @@ trial、demo、failed、refunded以及带refund/refunded/refundedAt标记的退�
 SPONSOR_SUPPORT_WEIGHT=0.6
 STAR_EXPOSURE_MULTIPLIERS=[1.5,1.2,1.0]
 STARHALL_MARKET_PHASE=AUTO
+# 随单展示位（delivery / ad-spot）的触达窗口（分钟）；窗口结束仍未达标 → 自动全额退款
+STARHALL_DELIVERY_AD_MINUTES=60
 ```
 
 AUTO 从首次成功paid开始进入MARKET LIVE并保持；此前为PRE-MARKET。可在本地启动前设置PRE-MARKET或MARKET LIVE作场景演练，phase本身不改变合法paid的计分规则。当前没有真实赛事时钟/积分发放适配器；云端接入时必须用正式赛事状态替换本地AUTO策略。
 
 Momentum 是相对上一笔成功交付前快照的分数变化；最近市场动作来自实际交付提交事件：付费服务/新赞助写入FAN_SUPPORT/SPONSOR_SUPPORT动作，sponsorPressure变化写入SPONSOR_PRESSURE动作，消息包含真实分数与「remains #N / now #N」排名表述。试用赞助造成的压力变化会明确标注「trial campaign, no Sponsor Support」，不增加任何支持分。榜单只报告StarHall内部事件，不声称整个Arena趋势。trial/demo Activity独立列出。
 
-## 曝光定义与边界
+## 曝光定义与边界（2026-09-13 按买方反馈重做）
 
-一次 impression 是广告附入已提交的交付或榜单响应。它证明系统将广告放入可查询交付/响应，不证明客户端成功阅读、用户注意、点击或转化。没有读回执、CTR、成交归因或ROI保证。客户端断开仍可保留已提交交付；其曝光语义是交付包含，而不是网络送达确认。
+一次 impression 是广告附入已提交的交付或榜单响应。它证明系统将广告放入可查询交付/响应，不证明客户端成功阅读、用户注意、点击或转化。没有读回执、CTR、转化归因或ROI保证。客户端断开仍可保留已提交交付；其曝光语义是交付包含，而不是网络送达确认。
+
+每个曝光事件都带 `viewer`、`viewerClass` 与 `counted` 三个字段。分类规则（`src/market.js` 的 `viewerClassOf`）：
+
+| viewerClass | 谁 | 计入 headline / 计费 |
+| --- | --- | --- |
+| independent | 其他已认证买家（`buyerId !== 广告主` 且非平台内部身份） | ✅ 每个 buyerId 在一个 campaign 内只计 1 次 |
+| self | 广告主自己的请求与订单 | ❌ |
+| platform | StarHall 自己的经纪人/明星/账本（`broker`、`star-a/b/c`、`ledger`） | ❌ |
+| anonymous | 无 token 的请求（含固定周期轮询的监视脚本） | ❌ |
+
+`GET /v1/ads` 与 `GET /v1/ads/{id}` 的头部数字：
+
+- `currentImpressions` = `verifiedReach` = 去重后的独立认证买家数（唯一计入结算与达标判定的数）。
+- `trackedImpressions` = 所有已记录的包含次数（原始审计，含上述四类）。
+- `inclusions{active,passive}`、`impressionsByClass`、`uniqueViewers`、`traffic`（仅 counted）分别给出原始与去重后分类计数。
+- `attribution{viewers,viewersWithLaterOrder,laterOrders}` = 在首次认证曝光之后下过单的买家（同一账本时间顺序；相关性，不是因果，0 是合法结果）。
+- 每条事件保留 `viewer`（买家 id 或 `anonymous`），广告主可以区分真人买家、自己的流程与机器人轮询。
+
+**读了不计数**：任何 GET 请求带 `X-StarHall-Impressions: none`（大小写不敏感，值为 none/skip/off/0/false 之一）时，响应照常返回广告，但**不创建任何曝光事件、不推进计数**，响应中 `impressionPolicy` 标为 `not-counted`、`surfaceId` 为 null。卖方监视器 `scripts/watch-arena.js` 已默认带这个头——自己的勤奋不能变成自己的广告数据。
 
 所有计数与对应内容在同一账本事务中提交。订单/练习重放、GET orders、GET ads、档案读取、启动恢复和投影导出不增加曝光。主动榜单无键时每次新查询是一份新响应；有键时按身份+键返回原快照，包含原asOf与surfaceId，不刷新或增加计数。已过期的历史响应重放仍是历史记录。
 
-投放不会凭空触达Arena。广告主本人、匿名调用和经纪人的合法查询也可能生成响应曝光，因此计数不是独立买家人数或抗刷量指标。公平调度、幂等和所有权已实现；外部真实买家流量、反刷策略和阅读确认仍需未来接入。
+**仍未实现的边界**：没有跨设备反刷量（同一真实买家换身份/开小号会被算作不同买家）、没有阅读回执、没有第三方审计；交付不能凭空触达 Arena，受众池取决于真实调用量。我们只主张“去重后的独立认证请求把广告附进了可查询响应”，不主张阅读或成交。
 
 ## 私有商业证据和诊断
 
@@ -133,7 +154,7 @@ Momentum 是相对上一笔成功交付前快照的分数变化；最近市场�
 }
 ```
 
-EXPLICIT=调用者明确提供；HIGH指明确报告，不代表第三方核验。BEHAVIORAL=真实使用带来的弱关注推断，LOW/INFERRED；OBSERVED=实际本地使用、支付状态、活动和曝光事件，带来源。失败/退款历史也可作状态证据，但不当作已完成付费效果。旧广告有计数却无历史事件时，不伪造逐条记录；`trackedImpressions`可能小于旧`currentImpressions`。
+EXPLICIT=调用者明确提供；HIGH指明确报告，不代表第三方核验。BEHAVIORAL=真实使用带来的弱关注推断，LOW/INFERRED；OBSERVED=实际本地使用、支付状态、活动和曝光事件，带来源。失败/退款历史也可作状态证据，但不当作已完成付费效果。旧广告有计数却无历史事件时，不伪造逐条记录；旧版 `currentImpressions` 是未分类的原始计数，新数据才保证 `currentImpressions === verifiedReach`。
 
 诊断的九个section：currentCommercialProfile、positioningDiagnosis、salesCommunicationDiagnosis、pricingDiagnosis、negotiationDiagnosis、distributionDiagnosis、evidenceSummary、mainBottleneck、recommendedNext3Actions。结论包含 finding、evidenceRefs、evidenceClass、confidence、status。KNOWN、INFERRED、UNKNOWN分开；无信息的项不制造证据。Evidence Summary提供完整证据索引。没有心理画像，也没有其他参赛队评价分析。
 
@@ -147,12 +168,15 @@ EXPLICIT=调用者明确提供；HIGH指明确报告，不代表第三方核验�
 
 ## 退款与交付保障（机器可验证）
 
-退款由确定性代码判断，LLM 不参与退款决策；买方理由只写入审计。固定 `refundReason` enum：DELIVERY_TIMEOUT、SERVER_ERROR、EMPTY_DELIVERY、SCHEMA_VALIDATION_FAILED、REQUIRED_COMPONENT_MISSING、BUDGET_VIOLATION、PRICE_FLOOR_VIOLATION、ADVERTISEMENT_ACTIVATION_FAILED、OTHER_MACHINE_VERIFIED_FAILURE。
+退款由确定性代码判断，LLM 不参与退款决策；买方理由只写入审计。固定 `refundReason` enum：DELIVERY_TIMEOUT、SERVER_ERROR、EMPTY_DELIVERY、SCHEMA_VALIDATION_FAILED、REQUIRED_COMPONENT_MISSING、BUDGET_VIOLATION、PRICE_FLOOR_VIOLATION、ADVERTISEMENT_ACTIVATION_FAILED、IMPRESSIONS_NOT_DELIVERED、FALLBACK_NOT_CHARGED、OTHER_MACHINE_VERIFIED_FAILURE。
 
 - **客观失败自动退款**：交付提交时以及每次退款请求都会重跑机器验证（交付非空、schema 合法、关键字段存在、无占位符、context fidelity 基础通过、Deal Coach 建议价不超 budget 不低于底价、广告 ACTIVE）。验证失败时 paid 订单自动进入 REFUNDED（超时/服务器错误等生成失败则订单直接 failed 不扣款）。
 - **主观不满意不退款**：风格、效果、改主意、找到别家、广告没带来销售等全部 `refundEligible=false`，`remedy=ONE_FREE_REVISION`。
 - **一次免费修订**：`POST /v1/orders/{id}/revision`，每个成功 paid 内容订单最多1次；不再次扣款、不增加销量/Fan Support/Sponsor Support、不新建订单、关联原 orderId、幂等。
-- **广告规则**：未激活或零曝光即失效 → ADVERTISEMENT_ACTIVATION_FAILED 自动退款；已产生真实曝光（impressions>0）→ 不可退款；仍 ACTIVE 且零曝光 → 暂不可退款。
+- **广告规则（按独立认证触达计）**：
+  - 按曝光计费的活动（delivery / 旧 ad-spot）：窗口结束（默认60分钟，`STARHALL_DELIVERY_AD_MINUTES`）时 `verifiedReach < displaysMax` → 机器**自动全额退款** `IMPRESSIONS_NOT_DELIVERED`，无需买家申请；达标则 fulfilled、不退。
+  - 限时活动（leaderboard / featured / 旧 ad-pin / ad-sponsor）：30分钟内产生过认证触达 → 不可退款；到期仍零认证触达 → 可退款 `ADVERTISEMENT_ACTIVATION_FAILED`（即使广告主自己或监视器产生过原始包含记录）；仍 ACTIVE 且零触达 → 暂不可退款 `CAMPAIGN_STILL_ACTIVE`。
+  - 自动对账由榜单/摘要/下单等写事务惰性触发（无定时器），退款幂等。
 - **回滚**：REFUNDED 订单最终净值：收入贡献0、Fan Support 贡献0、Sponsor Support 贡献0、active sponsor 贡献0、successful paid behavior=false；排行榜、Sponsor Pressure、Market Moves（记录 `sponsorship refunded` / `paid support reverted`）与 Commercial Diagnostic（记录为 attempted usage + finalStatus=REFUNDED，不计成功付费行为）立即重算；订单、作品、墙与审计历史保留。
 - **幂等**：`order.refund.refundApplied` 防止重复返积分、重复回滚支持、重复写退款事件；重复请求返回 ALREADY_REFUNDED。
 - trial/demo 不产生退款状态；trial 验证失败直接标记 failed。

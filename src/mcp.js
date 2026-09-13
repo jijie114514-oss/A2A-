@@ -40,10 +40,10 @@ export function toolDefinitions({ openRegistration = false } = {}) {
   const tools = [
     tool('starhall_catalog', '免费。StarHall 星辉舞台全部商品、实价、免费/付费分层、输入 JSON Schema、交付与退款条款、健康状态，以及当前赛程轮次与试用政策（第一轮点评免费试用，第二轮市场用积分购买）。调用前先读这里。',
       {}, [], { annotations: free }),
-    tool('starhall_market_board', '免费。本队真实商业行情：明星支持分、赞助压力、活动与广告位，不含其他队伍的销量。',
-      {}, [], { annotations: free }),
-    tool('starhall_summary', '免费。基础人气榜与最近打赏动态。',
-      {}, [], { annotations: free }),
+    tool('starhall_market_board', '免费。本队真实商业行情：明星支持分、赞助压力、活动与广告位，不含其他队伍的销量。可选带上 token：这次查询会计入你的已认证触达（广告主可在 /v1/ads 查到）；匿名请求仍可读，但不计触达。',
+      { token: { type: 'string', minLength: 8, maxLength: 256, description: '可选：你的身份令牌。带上时，这次行情查询计入你自己的已认证触达。' } }, [], { annotations: free }),
+    tool('starhall_summary', '免费。基础人气榜与最近打赏动态。可选带上 token 计入已认证触达。',
+      { token: { type: 'string', minLength: 8, maxLength: 256, description: '可选：你的身份令牌。' } }, [], { annotations: free }),
     tool('starhall_evidence', '免费公开。可机器核验的产品事实：交付数、live/备用比例、交付时延 p50/p95、退款原因分布、试用与成交统计，以及本产品「不主张什么」。第一轮点评时，具体异议请引用这里的数字；第二轮比价时用它比较交付可靠性。',
       {}, [], { annotations: free }),
   ];
@@ -132,8 +132,8 @@ export function createMcpServer(app, options = {}) {
         : { method: null, requiresHuman: true, note: '本部署未开放自助开户，请通过运营方获取 token' },
       protocol: 'MCP tools/call 与本地 JSON HTTP 调用同一套账本、授权与审计',
     } }),
-    starhall_market_board: () => app.marketBoard({ id: 'public' }).then(ok),
-    starhall_summary: () => app.summary().then(ok),
+    starhall_market_board: args => { const actor = (args.token || defaultToken) ? app.authenticate(args.token || defaultToken) : { id: 'public' }; return app.marketBoard(actor).then(ok); },
+    starhall_summary: args => { const actor = (args.token || defaultToken) ? app.authenticate(args.token || defaultToken) : { id: 'public' }; return app.summary(actor).then(ok); },
     starhall_evidence: () => ok(evidenceOf(app.store.read(), { services: app.catalog().services })),
     starhall_register: async args => {
       ensure(openRegistration, 'registration_closed', '本部署未开放自助开户，请通过运营方获取 token', 403);

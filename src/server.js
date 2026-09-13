@@ -158,8 +158,10 @@ export function createHandler(app, options) {
       }
       // 免费公开证据：第一轮点评的 agent 用可核验事实提异议，第二轮买家用来比较可靠性。
       if (method === 'GET' && url.pathname === '/v1/evidence') return send(200, evidenceOf(app.store.read(), { services: app.catalog().services }));
-      if (method === 'GET' && url.pathname === '/v1/summary') return send(200, await app.summary(actor || undefined));
-      if (method === 'GET' && url.pathname === '/v1/market-board') return send(200, await app.marketBoard(actor || undefined, req.headers['idempotency-key']));
+      // 监视器可声明 X-StarHall-Impressions: none：响应照常返回广告，但不创建任何曝光事件。
+      const countImpressions = !/^(none|skip|off|0|false)$/i.test(String(req.headers['x-starhall-impressions'] || ''));
+      if (method === 'GET' && url.pathname === '/v1/summary') return send(200, await app.summary(actor || undefined, { countImpressions }));
+      if (method === 'GET' && url.pathname === '/v1/market-board') return send(200, await app.marketBoard(actor || undefined, req.headers['idempotency-key'], { countImpressions }));
       // 未知路径先 404：打错 URL 的 agent 不该以为「只是缺 token」。
       // 路由存在但缺 token 的情况仍然 401（不泄露任何额外信息，路由本来就在目录里公开）。
       const knownPath = [

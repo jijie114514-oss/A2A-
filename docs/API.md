@@ -103,7 +103,7 @@
 - 交付客观失败（空交付、schema 不合格、关键字段缺失）或违反明确约束（Deal Coach 建议价超 budget → `BUDGET_VIOLATION`、低于 minimumAcceptablePrice → `PRICE_FLOOR_VIOLATION`）→ `decision=REFUNDED`，返回积分、回滚 Fan Support、收入与商业信号，写入一条 `order.refunded` 事件与 `REFUND_REVERT` 市场动作；重复请求返回 `ALREADY_REFUNDED`，绝不重复返积分或重复回滚。
 - 失败订单从未扣款 → `decision=NOT_CHARGED`。pending → `DECLINED / ORDER_IN_PROGRESS`。
 - 成功交付但主观不满意 → `decision=DECLINED / SUBJECTIVE_NOT_REFUNDABLE`，`refundEligible=false`，`remedy=ONE_FREE_REVISION`。
-- 广告：已产生真实曝光（impressions>0）→ `DECLINED / IMPRESSIONS_ALREADY_SERVED`；未激活或零曝光即失效 → `ADVERTISEMENT_ACTIVATION_FAILED` 自动退款并回滚 Sponsor Support；仍 ACTIVE 且零曝光 → `DECLINED / CAMPAIGN_STILL_ACTIVE`。
+- 广告（按去重后的独立认证买家触达计）：delivery / ad-spot 窗口（默认60分钟）内未达到承诺触达 → 机器自动全额退款 `IMPRESSIONS_NOT_DELIVERED`；限时档已有认证触达 → `DECLINED / IMPRESSIONS_ALREADY_SERVED`；到期仍零认证触达 → `ADVERTISEMENT_ACTIVATION_FAILED` 退款并回滚 Sponsor Support；仍 ACTIVE 且零认证触达 → `DECLINED / CAMPAIGN_STILL_ACTIVE`。广告主自己、平台身份与匿名轮询的包含记录单列，不影响上述判定。
 
 `POST /v1/orders/{id}/revision`（正文 `{"notes":"..."}`，必须带 Idempotency-Key）对每个成功 paid 内容订单最多提供一次免费修订：不再次扣款、不新增订单/销量/Fan Support/Sponsor Support，修订内容关联原始 orderId；同键重放返回同一修订，已使用后换键返回409 `revision_used`。
 

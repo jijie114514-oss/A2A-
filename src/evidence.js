@@ -71,7 +71,7 @@ export function evidenceOf(state, options = {}) {
     prices: (options.services || []).map(s => ({ id: s.id, name: s.name, price: s.price ?? null,
       plans: s.plans ? Object.values(s.plans).map(p => p.price) : null, maxDeliverySeconds: s.maxDeliverySeconds ?? null })),
     whatWeDoNotClaim: [
-      '展示次数（impressions）只统计「附进了交付或榜单响应」，不等于阅读、点击、转化或收入。',
+      '展示次数（impressions）只统计「附进了交付或榜单响应」，其中 headline（currentImpressions / verifiedReach）只计去重后的独立认证买家；不等于阅读、点击、转化或收入。',
       'Sales Stress Test 的异议是模型模拟的，不是真实买家反馈；交付里标记 evidenceType=SIMULATED。',
       '本产品的积分是模拟账本，不是支付；真实比赛积分在 SharedNet 房间结算，不经过本 API。',
       '预测类输出是条件性的选品框架，不是对比赛结果的承诺。',

@@ -100,6 +100,9 @@ test('H: active board views record real events once per receipt; expiry and tria
   assert.deepEqual((await app.marketBoard()).sponsors, []); assert.equal(app.adById(buyer, id).currentImpressions, 2);
   const trial = await app.order(buyer, sponsor('star-a', 'delivery'), 'trial-ad', { trial: true });
   for (let i = 0; i < 3; i++) await app.order(other, pitch, `view-${i}`);
+  assert.equal(app.adById(buyer, trial.delivery.ad.id).currentImpressions, 1, '同一买家只计一次');
+  const trialViewer = (await app.registerAgent({ handle: 'trial-viewer-h', secret: 'trial-secret-0123456789' })).account;
+  await app.order(trialViewer, pitch, 'view-extra');
   const stats = app.adById(buyer, trial.delivery.ad.id);
   assert.equal(stats.currentImpressions, 2); assert.equal(stats.status, 'fulfilled');
   assert.equal(marketBoard(app.store.read()).ranking.find(r => r.star === 'star-a').sponsorSupport, 0);
@@ -110,9 +113,10 @@ test('C/H: weighted shared slots give all stars exposure and rotate competing sp
     const id = `ad-${starId}`; const ad = { id, orderId: id, buyerId: starId, starId, tier: 'ad-pin', advertiser: 'Fixture', text: 'Fixture ad', status: 'active', kind: 'paid', displays: 0, createdAt: '2026-01-01' };
     state.ads.push(ad); state.orders.push({ id, status: 'delivered', price: 10, delivery: { ad } });
   }
-  for (let i = 0; i < 37; i++) boardResponse(state, 'public');
+  for (let i = 0; i < 37; i++) boardResponse(state, `fan-${i}`);
   assert.deepEqual(state.ads.map(a => a.displays), [15, 12, 10]);
   assert.equal(state.impressions.length, 37);
+  assert.ok(state.impressions.every(i => i.counted && i.viewerClass === 'independent'));
 });
 test('I: diagnostic uses own history and impressions; all findings carry evidence/status and recommend exactly three actions', async t => {
   const { app } = await setup(t);
@@ -237,18 +241,23 @@ test('legacy pin impressions reflect returned summaries; background projections 
   const { app } = await setup(t);
   const ad = await app.order(buyer, { service: 'ad-pin', input: { text: 'Legacy fixture' } }, 'legacy');
   assert.equal(app.adById(buyer, ad.delivery.ad.id).currentImpressions, 0);
-  await app.summary(); assert.equal(app.adById(buyer, ad.delivery.ad.id).currentImpressions, 1);
+  await app.summary(); // 匿名读：置顶广告照常返回，但不计认证触达
+  assert.equal(app.adById(buyer, ad.delivery.ad.id).currentImpressions, 0);
+  assert.equal(app.adById(buyer, ad.delivery.ad.id).trackedImpressions, 1);
   await app.store.projections(); app.getOrder(buyer, ad.id);
-  assert.equal(app.adById(buyer, ad.delivery.ad.id).currentImpressions, 1);
+  assert.equal(app.adById(buyer, ad.delivery.ad.id).currentImpressions, 0);
   const order = await app.order(other, pitch, 'pitch');
   assert.ok(order.delivery.summary.ads.pinned.some(a => a.id === ad.delivery.ad.id));
-  assert.equal(app.adById(buyer, ad.delivery.ad.id).currentImpressions, 2);
+  assert.equal(app.adById(buyer, ad.delivery.ad.id).currentImpressions, 1);
 });
 test('same-star campaigns rotate fairly and exposure exhaustion removes real sponsor pressure', async t => {
   const { app } = await setup(t);
   const first = await app.order(buyer, sponsor('star-b', 'delivery'), 'a');
   const second = await app.order(buyer, sponsor('star-b', 'delivery'), 'b');
-  for (let i = 0; i < 6; i++) await app.order(other, stress, `delivery-${i}`);
+  for (let i = 1; i <= 6; i++) {
+    const viewer = (await app.registerAgent({ handle: `rotate-${i}`, secret: 'rotate-secret-0123456789' })).account;
+    await app.order(viewer, stress, `delivery-${i}`);
+  }
   assert.equal(app.adById(buyer, first.delivery.ad.id).currentImpressions, 3);
   assert.equal(app.adById(buyer, second.delivery.ad.id).currentImpressions, 3);
   assert.equal(marketBoard(app.store.read()).ranking.find(r => r.star === 'star-b').activeSponsors, 2);

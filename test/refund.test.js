@@ -108,12 +108,13 @@ test('Test 6: inactive sponsorship with zero impressions is refunded; Sponsor Su
   assert.equal(app.adById(buyer, order.delivery.ad.id).status, 'refunded');
 });
 
-// ── Test 7: impressions already served → refundEligible false ──
+// ── Test 7: impressions already served → refundEligible false（同一买家的重复请求只计 1 次触达） ──
 test('Test 7: sponsorship with real impressions is not refundable', async t => {
   const { app } = await setup(t);
   const order = await app.order(buyer, sponsor(), 't7');
   for (let i = 0; i < 3; i++) await app.marketBoard(other, `view-${i}`);
-  assert.equal(app.adById(buyer, order.delivery.ad.id).currentImpressions, 3);
+  assert.equal(app.adById(buyer, order.delivery.ad.id).currentImpressions, 1);
+  assert.equal(app.adById(buyer, order.delivery.ad.id).trackedImpressions, 3);
   const r = await app.refund(buyer, order.id, { reason: '广告没效果' });
   assert.equal(r.decision, 'DECLINED'); assert.equal(r.declineCode, 'IMPRESSIONS_ALREADY_SERVED');
   assert.equal(r.refundEligible, false); assert.equal(r.refundReason, null);

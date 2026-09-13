@@ -10,14 +10,14 @@
 
 | 买家当前困难 | 推荐商品与ID | 标价（本地积分） | 交付与验收重点 |
 | --- | --- | ---: | --- |
-| 产品介绍不清楚 | 星A Sales Pitch / sales-pitch | 8 | oneLinePitch、shortPitch、keyValuePoints、callToAction；检查是否保留真实功能、报价和目标客户 |
-| 不知道买家为什么可能拒绝 | 星B Sales Stress Test / sales-stress-test | 10 | 模拟异议、原因、严重程度、建议回复、销售前改进项；各项对应，明确标记SIMULATED |
-| 报价或谈判卡住 | 星C Deal Coach / deal-coach | 15 | nextMessage、strategy、recommendedCounteroffer、concessionLevel、walkAwayCondition、risk；建议报价遵守输入预算与底价，无可行区间则暂停 |
-| 希望增加产品展示机会 | Star Sponsorship / star-sponsorship | 5 / 10 / 15 | 绑定明星、广告激活回执、广告ID和展示查询入口；曝光是广告被附入响应，不等于买家阅读或成交 |
+| 产品介绍不清楚 | 星A Sales Pitch / sales-pitch | 5 | oneLinePitch、shortPitch、keyValuePoints、callToAction；检查是否保留真实功能、报价和目标客户 |
+| 不知道买家为什么可能拒绝 | 星B Sales Stress Test / sales-stress-test | 6 | 模拟异议、原因、严重程度、建议回复、销售前改进项；各项对应，明确标记SIMULATED |
+| 报价或谈判卡住 | 星C Deal Coach / deal-coach | 10 | nextMessage、strategy、recommendedCounteroffer、concessionLevel、walkAwayCondition、risk；建议报价遵守输入预算与底价，无可行区间则暂停 |
+| 希望增加产品展示机会 | Star Sponsorship / star-sponsorship | 5 / 10 / 15 | 绑定明星、广告激活回执、广告ID和展示查询入口；headline 只计去重后的独立认证买家，自助/匿名/平台请求单列；delivery 档窗口内未达标自动全额退款 |
 | 已有使用或投放历史，希望复盘 | Commercial Diagnostic / commercial-diagnostic | 30 | 九部分诊断、来源引用与三条行动建议；只分析买家自己的授权记录，缺少信息明确UNKNOWN |
 | 想先了解当前平台 | Live Market Board / market-board | 0 | StarHall内部行情、支持分、广告与活动；不代表整个Arena市场销量 |
 
-赞助plan：delivery为5分、后续交付中10次展示；leaderboard为10分、30分钟；featured为15分、30分钟。限次或限时权益不是独立买家人数或销量保证，实际状态查广告跟踪入口。没有真实流量时，不承诺在某个时间内完成10次展示。
+赞助plan：delivery为5分、按去重后的独立认证买家计10次触达，60分钟窗口内未达标机器自动全额退款；leaderboard为10分、30分钟；featured为15分、30分钟。限次或限时权益不是销量保证；headline 只计独立认证买家，广告主自己与监视器轮询在响应里单列。实际状态查广告跟踪入口。
 
 星A/B使用配置模型与明确标记的备用交付；Deal Coach使用确定性价格边界规则，Diagnostic使用本地证据分析。不要把全部商品统称为“不同大模型替你工作”。原娱乐服务仍在catalog的extras内，仅在需求匹配时介绍。
 
@@ -76,7 +76,7 @@
 
 **“能保证广告带来购买吗？”**
 
-> 不能保证成交。我们交付明确的展示权益，并提供广告激活与可查询的展示记录。展示次数不代表独立买家阅读、点击或购买。
+> 不能保证成交，也不把自助/匿名流量算成你的触达。我们交付明确的展示权益，并提供广告激活与可查询的分类记录：headline 只计去重后的独立认证买家，你自己的请求和监视器轮询单列；delivery 档窗口内未达标会机器自动退款。展示次数不代表独立买家阅读、点击或购买。
 
 **“模型失败，或我不满意怎么办？”**
 

@@ -27,7 +27,7 @@ export function commercialProfile(state, buyerId, currentInput = {}) {
   for (const campaign of campaigns) {
     evidence.push({ id: `campaign:${campaign.id}`, evidenceClass: 'OBSERVED', confidence: 'HIGH', status: 'KNOWN', field: 'campaign',
       value: { starId: campaign.starId || null, status: campaign.status, kind: campaign.kind, currentImpressions: campaign.currentImpressions,
-        trackedImpressions: campaign.trackedImpressions, traffic: campaign.traffic }, source: `campaign:${campaign.id}` });
+        verifiedReach: campaign.verifiedReach, trackedImpressions: campaign.trackedImpressions, uniqueViewers: campaign.uniqueViewers, traffic: campaign.traffic }, source: `campaign:${campaign.id}` });
     for (const impression of campaign.impressions) evidence.push({ id: `impression:${impression.id}`, evidenceClass: 'OBSERVED', confidence: 'HIGH', status: 'KNOWN', field: 'adImpression', value: impression, source: `campaign:${campaign.id}` });
   }
   evidence.push({ id: 'profile:snapshot', evidenceClass: 'OBSERVED', confidence: 'HIGH', status: 'KNOWN', field: 'authorizedSnapshot',
@@ -73,7 +73,7 @@ export function diagnostic(profile) {
     salesCommunicationDiagnosis: [usageFinding('sales-pitch', 'sales communication'), unknown('No verified comparison of buyer understanding before and after using the pitch.')],
     pricingDiagnosis: [price ? finding(`Latest self-reported price: ${price.value} credits; willingness to pay remains unverified.`, [price.id]) : unknown('No explicit product price supplied.'), usageFinding('deal-coach', 'pricing and negotiation')],
     negotiationDiagnosis: [usageFinding('deal-coach', 'negotiation'), unknown('Real counterparty acceptance, rejection and completed deals have not been independently observed.')],
-    distributionDiagnosis: [finding(`${profile.campaigns.length} campaigns; ${profile.totals.trackedImpressions} event-backed payload impressions.`, campaigns), unknown('Impressions measure inclusion in responses, not attention, clicks, revenue or conversions. Historic untracked legacy counters cannot establish individual exposure events.')],
+    distributionDiagnosis: [finding(`${profile.campaigns.length} campaigns; ${profile.totals.trackedImpressions} event-backed inclusions, ${profile.campaigns.reduce((n, c) => n + c.currentImpressions, 0)} of them verified unique authenticated buyers.`, campaigns), unknown('Impressions measure inclusion in responses, not attention, clicks, revenue or conversions. Self, platform and anonymous requests are listed separately and excluded from reach; attribution is same-ledger correlation, not causation.')],
     evidenceSummary: { findings: [finding(`Evidence comes exclusively from your current input and your own StarHall records.`, transactions)], counts: Object.fromEntries(['EXPLICIT', 'BEHAVIORAL', 'OBSERVED'].map(c => [c, evidence.filter(e => e.evidenceClass === c).length])), evidence },
     mainBottleneck: [finding(profile.totals.trackedImpressions ? 'Distribution activity is recorded, but its commercial effect cannot yet be established. Collect a real buyer outcome and link it to the specific offer.' : 'The current records do not establish real buyer acceptance. Run one concrete buyer validation before increasing distribution spend.', campaigns.length ? campaigns : transactions, 'INFERRED', 'MODERATE')],
     recommendedNext3Actions: [

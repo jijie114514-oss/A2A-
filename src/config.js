@@ -56,6 +56,8 @@ export function config(env = process.env) {
   ensure(Array.isArray(exposureMultipliers) && exposureMultipliers.length === 3 && exposureMultipliers.every(n => typeof n === 'number' && Number.isFinite(n) && n > 0 && n <= 100) && exposureMultipliers[0] >= exposureMultipliers[1] && exposureMultipliers[1] >= exposureMultipliers[2], 'invalid_config', '需要三个递减或相等的正数曝光权重');
   const phase = env.STARHALL_MARKET_PHASE || 'AUTO';
   ensure(['AUTO', 'PRE-MARKET', 'MARKET LIVE'].includes(phase), 'invalid_config', '市场阶段需要AUTO、PRE-MARKET或MARKET LIVE');
+  const deliveryAdMinutes = Number(env.STARHALL_DELIVERY_AD_MINUTES ?? MARKET_DEFAULTS.deliveryAdMinutes);
+  ensure(Number.isFinite(deliveryAdMinutes) && deliveryAdMinutes >= 5 && deliveryAdMinutes <= 1440, 'invalid_config', 'STARHALL_DELIVERY_AD_MINUTES 范围为5–1440分钟');
   const normalizedBase = baseUrl.replace(/\/+$/, '');
   // 官方身份：本地默认不配置，行为与 0.5.0-local 完全一致。见 docs/MCP.md。
   const tenantId = env.STARHALL_TENANT_ID || '';
@@ -83,7 +85,7 @@ export function config(env = process.env) {
       : { method: null, requiresHuman: true, note: '未开放自助开户；请通过运营方获取 token' },
     note: 'MCP、JSON HTTP 与 CLI 调用同一套内核授权、账本与审计；没有第二条绕过 grants 的路径。',
   } : undefined;
-  return { mode, store, databaseUrl, host, allowedHosts, publicBaseUrl, openRegistration, registrationCredits, registrationLimitPerHour, mcpToken: env.STARHALL_MCP_TOKEN || '', access, identity, port, market: { sponsorSupportWeight, exposureMultipliers, phase }, fixtureMarket: env.STARHALL_FIXTURE_MARKET === 'true',
+  return { mode, store, databaseUrl, host, allowedHosts, publicBaseUrl, openRegistration, registrationCredits, registrationLimitPerHour, mcpToken: env.STARHALL_MCP_TOKEN || '', access, identity, port, market: { sponsorSupportWeight, exposureMultipliers, phase, deliveryAdMinutes }, fixtureMarket: env.STARHALL_FIXTURE_MARKET === 'true',
     // 云端没有可写的持久目录，dataDir 只在 file 驱动下有意义（保留字段以免破坏本地脚本）。
     dataDir: store === 'file' ? path.resolve(env.STARHALL_DATA_DIR || 'data') : null, llm: {
     provider, apiKey: env.LLM_API_KEY || '', model: env.LLM_MODEL || '', baseUrl: provider === 'ark-responses' ? normalizedBase.replace(/\/responses$/, '') : normalizedBase, timeoutMs, fallback: env.LLM_FALLBACK !== 'false', tokenLimitField,

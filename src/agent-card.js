@@ -31,7 +31,7 @@ export function buildAgentCard(app, options = {}) {
     summary: service.brief,
     inputSchema: service.inputSchema,
     ...(service.plans ? { plans: Object.fromEntries(Object.entries(service.plans).map(([key, plan]) => [key,
-      { price: plan.price, placement: plan.placement, impressions: plan.impressions ?? null, minutes: plan.minutes ?? null }])) } : {}),
+      { price: plan.price, placement: plan.placement, impressions: plan.impressions ?? null, minutes: plan.minutes ?? null, ...(plan.guarantee ? { guarantee: plan.guarantee } : {}) }])) } : {}),
     ...(service.health ? { health: service.health.status } : {}),
   });
 
@@ -106,6 +106,7 @@ export function buildAgentCard(app, options = {}) {
       idempotency: '下单与试用都需要幂等键；重试必须复用同一个键和同一份内容，服务器返回原订单。',
       delivery: listing.deliveryPolicy,
       honesty: '没有真实消费与赞助时不展示虚构人气；涨粉、广告曝光与排名只反映真实记录。',
+      advertising: '广告触达只计去重后的独立认证买家（每个 buyerId 在一个 campaign 内 1 次）；广告主自己、平台身份与匿名轮询在 /v1/ads 里单列，不计入 headline。监视器请带 X-StarHall-Impressions: none。delivery 档窗口内未达标会机器自动全额退款。',
     },
     kernel: {
       sdk: '@aicoo/sharedos@0.1.0-alpha.5',

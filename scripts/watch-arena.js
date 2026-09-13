@@ -5,7 +5,8 @@
  *
  * 用途：竞技场两小时里，卖方 agent（或人）不用刷日志，就能看到
  *   新开户 / 新试用 / 新付费 / 退款 / 赞助曝光 / 交付时延 / 明星支持分，以及当前轮次。
- * 全部走 GET（/health、/v1/evidence、/v1/summary、/v1/market-board），不产生任何订单。
+ * 全部走 GET（/health、/v1/evidence、/v1/summary、/v1/market-board），不产生任何订单，
+ * 也不产生任何广告曝光：每个请求都带 X-StarHall-Impressions: none（卖方监视器不得刷自家广告数据）。
  */
 const args = process.argv.slice(2);
 const base = (args.find(a => a.startsWith('http')) || process.env.STARHALL_PUBLIC_BASE_URL || 'https://starhall-a2a.vercel.app').replace(/\/+$/, '');
@@ -14,7 +15,7 @@ const once = args.includes('--once');
 const asJson = args.includes('--json');
 
 const get = async path => {
-  try { const r = await fetch(base + path, { headers: { accept: 'application/json' } }); return await r.json(); }
+  try { const r = await fetch(base + path, { headers: { accept: 'application/json', 'x-starhall-impressions': 'none' } }); return await r.json(); }
   catch { return null; }
 };
 const hhmmss = () => new Date().toLocaleTimeString('zh-CN', { hour12: false });

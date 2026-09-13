@@ -1,7 +1,22 @@
 import { randomUUID } from 'node:crypto';
 import { roundContext } from './rounds.js';
 
-export const MARKET_DEFAULTS = { sponsorSupportWeight: 0.6, exposureMultipliers: [1.5, 1.2, 1], phase: 'AUTO' };
+export const MARKET_DEFAULTS = { sponsorSupportWeight: 0.6, exposureMultipliers: [1.5, 1.2, 1], phase: 'AUTO', deliveryAdMinutes: 60 };
+/** 平台自己的身份：它们的请求不算外部触达。 */
+export const PLATFORM_VIEWERS = Object.freeze(['broker', 'star-a', 'star-b', 'star-c', 'ledger']);
+/**
+ * 曝光分类（测试端 2026-09-13 反馈）：
+ *   independent = 其他已认证买家（唯一计入 headline 与计费的触达）
+ *   self        = 广告主自己的请求/订单（自产流量，不算触达）
+ *   platform    = StarHall 自己的经纪人/明星/账本（自家流量）
+ *   anonymous   = 没有 token 的请求（含固定周期轮询的监视脚本，不算认证触达）
+ */
+export function viewerClassOf(ad, viewer) {
+  if (!viewer || viewer === 'public' || viewer === 'anonymous') return 'anonymous';
+  if (viewer === ad.buyerId) return 'self';
+  if (PLATFORM_VIEWERS.includes(viewer)) return 'platform';
+  return 'independent';
+}
 export const STAR_ROLES = {
   'star-a': { role: 'Sales Communication', audience: 'Agents preparing to sell and explain product value' },
   'star-b': { role: 'Sales Stress Test', audience: 'Agents testing their own offers, objections and risks' },
@@ -41,7 +56,8 @@ export function marketBoard(state, at = Date.now()) {
     recentMarketMoves: (state.marketMoves || []).slice(-8).reverse(),
     policy: { ...settings, momentumBasis: 'score change since last successful delivery', tieBreak: 'starId ascending, not evidence of popularity',
       sponsorPressureBasis: 'active campaigns including labelled trials; NONE=0, LOW=1, MEDIUM=2–3, HIGH>=4',
-      impressionDefinition: 'ad included in a committed delivery or board response; not proof of reading or conversion' }, asOf: new Date(at).toISOString() };
+      impressionDefinition: 'impression = ad included in a committed delivery or board response. Reach counts unique authenticated external buyers only; self, platform and unauthenticated requests are recorded separately. Not proof of reading or conversion.',
+      countPolicy: 'authenticated independent buyer = 1 count per campaign (deduplicated); send X-StarHall-Impressions: none to read without creating impressions.' }, asOf: new Date(at).toISOString() };
 }
 export function recordMarketMove(state, order, before) {
   state.marketSnapshot = before.ranking.map(({ star, starScore }) => ({ star, starScore }));
@@ -95,7 +111,7 @@ function selectAd(state, candidates, slot) {
   const selected = rows[0].star; scores[selected] -= total;
   return candidates.filter(a => a.starId === selected).sort((a, b) => a.displays - b.displays || a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id))[0];
 }
-export function expose(state, { surfaceId, traffic, stars = [], compact = false, skipAdId = null }) {
+export function expose(state, { surfaceId, traffic, stars = [], compact = false, skipAdId = null, viewer = null, count = true }) {
   state.impressions ||= [];
   const shown = [];
   const slots = [...new Set(stars)].map(star => ({ key: `delivery:${star}`, filter: a => a.starId === star && ['ad-spot', 'ad-sponsor'].includes(a.tier) }));
@@ -105,29 +121,47 @@ export function expose(state, { surfaceId, traffic, stars = [], compact = false,
     const ad = selectAd(state, candidates.filter(slot.filter), slot.key);
     if (!ad) continue;
     const eventId = `${surfaceId}:${ad.id}`;
-    if (!state.impressions.some(i => i.id === eventId)) {
-      ad.displays++; ad.lastDisplayAt = new Date().toISOString();
-      if (ad.displaysMax && ad.displays >= ad.displaysMax) ad.status = 'fulfilled';
-      state.impressions.push({ id: eventId, adId: ad.id, buyerId: ad.buyerId, starId: ad.starId, traffic, surface: slot.key, surfaceId, at: ad.lastDisplayAt, evidenceClass: 'OBSERVED' });
-    }
-    shown.push({ adId: ad.id, starId: ad.starId, placement: slot.key, advertiser: ad.advertiser, adCopy: ad.text, kind: ad.kind, sponsored: true, impressionId: eventId });
+    // count=false 用于卖方自己的监视器：广告照常展示，但不写入任何曝光事件（"你们越勤奋，广告数据越假"）。
+    const event = count ? recordImpression(state, ad, { id: eventId, traffic, surface: slot.key, surfaceId, viewer }) : null;
+    shown.push({ adId: ad.id, starId: ad.starId, placement: slot.key, advertiser: ad.advertiser, adCopy: ad.text, kind: ad.kind, sponsored: true,
+      impressionId: event ? event.id : null, counted: Boolean(event?.counted) });
   }
   return shown;
 }
-export function compactBoard(state, surfaceId, stars = [], skipAdId = null) {
-  const sponsors = expose(state, { surfaceId, traffic: 'PASSIVE', stars, compact: true, skipAdId });
+/** 只记账一次曝光事件。headline 只计「去重的独立认证买家」；self/platform/anonymous 一律记录但不计数。 */
+function recordImpression(state, ad, { id, traffic, surface, surfaceId, viewer }) {
+  state.impressions ||= [];
+  const existing = state.impressions.find(i => i.id === id);
+  if (existing) return existing;
+  const viewerClass = viewerClassOf(ad, viewer);
+  const counted = viewerClass === 'independent' && !state.impressions.some(i => i.adId === ad.id && i.counted && i.viewer === viewer);
+  const at = new Date().toISOString();
+  const event = { id, adId: ad.id, buyerId: ad.buyerId, starId: ad.starId ?? null, traffic, surface, surfaceId, at,
+    evidenceClass: 'OBSERVED', viewer: viewer || 'anonymous', viewerClass, counted };
+  state.impressions.push(event);
+  if (counted) {
+    ad.displays = (ad.displays || 0) + 1;
+    ad.lastDisplayAt = at;
+    if (ad.displaysMax && ad.displays >= ad.displaysMax) ad.status = 'fulfilled';
+  }
+  return event;
+}
+export function compactBoard(state, surfaceId, stars = [], skipAdId = null, viewer = null) {
+  const sponsors = expose(state, { surfaceId, traffic: 'PASSIVE', stars, compact: true, skipAdId, viewer });
   const board = marketBoard(state);
   return { phase: board.phase, ranking: board.ranking.map(({ starId, rank, starScore, momentum }) => ({ starId, rank, starScore, momentum })),
     sponsors, fullBoard: { method: 'GET', path: '/v1/market-board', price: 0 } };
 }
-export function boardResponse(state, actorId, key) {
+export function boardResponse(state, actorId, key, { countImpressions = true } = {}) {
   state.boardReceipts ||= {};
   const scope = key ? JSON.stringify([actorId, key]) : null;
   if (scope && state.boardReceipts[scope]) return state.boardReceipts[scope];
   const surfaceId = `board:${randomUUID()}`;
-  const sponsors = expose(state, { surfaceId, traffic: 'ACTIVE' });
+  const sponsors = expose(state, { surfaceId, traffic: 'ACTIVE', viewer: actorId, count: countImpressions });
   // 轮次也放在榜单回执里：买方 agent 轮询行情时顺带知道此刻该试用还是该购买。
-  const result = { ...marketBoard(state), round: roundContext(), surfaceId, sponsors };
+  const result = { ...marketBoard(state), round: roundContext(), surfaceId: countImpressions ? surfaceId : null, sponsors,
+    impressionPolicy: countImpressions ? 'counted (authenticated independent buyers only; self/platform/anonymous are recorded but excluded from reach)'
+      : 'not-counted (X-StarHall-Impressions: none — this response created no impression events)' };
   if (scope) state.boardReceipts[scope] = result;
   return result;
 }
@@ -135,17 +169,28 @@ export function campaignStats(state, ad) {
   const impressions = (state.impressions || []).filter(i => i.adId === ad.id);
   const order = state.orders.find(o => o.id === ad.orderId);
   const refunded = order?.status === 'refunded' || Boolean(order?.refund?.refundApplied);
+  const classes = { independent: [], self: [], platform: [], anonymous: [] };
+  for (const impression of impressions) (classes[impression.viewerClass] || classes.anonymous).push(impression);
+  const counted = impressions.filter(i => i.counted);
+  // 归因只给出「同一账本里，看过之后又下过单的买家」——相关性，不是因果，0 也是合法结果。
+  const firstCounted = new Map();
+  for (const impression of counted) if (!firstCounted.has(impression.viewer)) firstCounted.set(impression.viewer, impression);
+  const laterOrders = [];
+  for (const [viewer, first] of firstCounted)
+    for (const candidate of state.orders)
+      if (candidate.buyerId === viewer && Date.parse(candidate.createdAt) > Date.parse(first.at))
+        laterOrders.push({ viewer, orderId: candidate.id, service: candidate.service, kind: candidate.kind, at: candidate.createdAt });
   return { ...ad, status: refunded ? 'refunded' : activeAd(state, ad) ? 'active' : ad.status === 'active' ? 'expired' : ad.status,
     refunded, ...(order?.refund ? { refundReason: order.refund.refundReason } : {}),
-    currentImpressions: ad.displays, trackedImpressions: impressions.length, traffic: {
-      active: impressions.filter(i => i.traffic === 'ACTIVE').length, passive: impressions.filter(i => i.traffic === 'PASSIVE').length },
-    impressions: impressions.map(({ buyerId, ...i }) => i), trackingEndpoint: `/v1/ads/${ad.id}` };
+    currentImpressions: ad.displays, verifiedReach: ad.displays, trackedImpressions: impressions.length,
+    traffic: { active: counted.filter(i => i.traffic === 'ACTIVE').length, passive: counted.filter(i => i.traffic === 'PASSIVE').length },
+    inclusions: { total: impressions.length, active: impressions.filter(i => i.traffic === 'ACTIVE').length, passive: impressions.filter(i => i.traffic === 'PASSIVE').length },
+    impressionsByClass: Object.fromEntries(Object.entries(classes).map(([kind, list]) => [kind, list.length])),
+    uniqueViewers: Object.fromEntries(Object.entries(classes).map(([kind, list]) => [kind, new Set(list.map(i => i.viewer)).size])),
+    attribution: { viewers: firstCounted.size, viewersWithLaterOrder: new Set(laterOrders.map(o => o.viewer)).size, laterOrders,
+      note: 'Same-ledger time ordering: viewers who placed an order after their first verified impression. Correlation only — not proof the ad caused the order, and 0 is a valid result.' },
+    impressions: impressions.map(({ buyerId, ...impression }) => impression), trackingEndpoint: `/v1/ads/${ad.id}` };
 }
-export function recordLegacyImpression(state, ad, surfaceId, traffic, surface) {
-  state.impressions ||= [];
-  const id = `${surfaceId}:${ad.id}`;
-  if (state.impressions.some(i => i.id === id)) return;
-  ad.displays++; ad.lastDisplayAt = new Date().toISOString();
-  if (ad.displaysMax && ad.displays >= ad.displaysMax) ad.status = 'fulfilled';
-  state.impressions.push({ id, adId: ad.id, buyerId: ad.buyerId, starId: null, traffic, surface, surfaceId, at: ad.lastDisplayAt, evidenceClass: 'OBSERVED' });
+export function recordLegacyImpression(state, ad, surfaceId, traffic, surface, viewer = null) {
+  return recordImpression(state, ad, { id: `${surfaceId}:${ad.id}`, traffic, surface, surfaceId, viewer });
 }
