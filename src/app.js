@@ -444,7 +444,9 @@ export class StarHall {
     const refunded = ['REFUNDED', 'ALREADY_REFUNDED'].includes(outcome.decision);
     return { orderId: id, ...outcome, machineDecided: true,
       refundEligible: refunded, refundReason: fresh?.refund?.refundReason || null,
-      remedy: outcome.decision === 'DECLINED' && fresh?.kind === 'paid' && !fresh?.delivery?.ad && fresh?.status === 'delivered' ? 'ONE_FREE_REVISION' : null,
+      // 与 revisionAvailable 用同一条件：修订已经用掉就不能再宣告还有补救，
+      // 否则买家 agent 会照着 remedy 去调修订，拿到 409 revision_used（自相矛盾的回执）。
+      remedy: outcome.decision === 'DECLINED' && fresh?.kind === 'paid' && !fresh?.delivery?.ad && fresh?.status === 'delivered' && !fresh?.delivery?.revision?.used ? 'ONE_FREE_REVISION' : null,
       chargedCredits: fresh?.status === 'delivered' ? fresh.price : 0,
       revisionAvailable: outcome.decision === 'DECLINED' && fresh?.kind === 'paid' && !fresh?.delivery?.ad && fresh?.status === 'delivered' && !fresh?.delivery?.revision?.used,
       verification: verdict, order: this.publicOrder(fresh) };

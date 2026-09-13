@@ -68,7 +68,9 @@ export function catalog(mode = 'local') {
   const free = { ...legacy.services[0], id: 'market-board', name: 'StarHall Live Market Board', brief: '免费查看本队真实商业行情、明星支持与赞助压力。', call: { method: 'GET', path: '/v1/market-board', purpose: 'market-board-read' } };
   return { ...legacy, round: roundContext(), product: 'STARHALL — SELL BETTER IN THE ARENA', positioning: 'Three commercial stars, real local usage, sponsorship and evidence-based commercial analysis.',
     stars: Object.entries(STAR_ROLES).map(([starId, role]) => ({ starId, ...role })),
-    services: [...COMMERCIAL_SERVICES.map(s => ({ ...s, call: { method: 'POST', path: '/v1/orders', purpose: 'market-tip', body: { service: s.id, input: s.example } } })), free],
+    services: [...COMMERCIAL_SERVICES.map(s => ({ ...s, call: { method: 'POST', path: '/v1/orders', purpose: 'market-tip', body: { service: s.id, input: s.example } },
+      // 按 plan 计价的服务 price 是 null：加 priceFrom + pricing，避免外部 agent 误以为免费。
+      ...(s.plans ? { pricing: 'by-plan', priceFrom: Math.min(...Object.values(s.plans).map(p => p.price)) } : {}) })), free],
     extras: { name: 'CELEBRITY EXTRAS', services: legacy.services.slice(1), note: 'Legacy unbound ads remain callable but are not the primary sponsorship model and do not create Sponsor Support.' },
     free: { name: free.name, price: 0, method: 'GET', path: '/v1/market-board', compatibilityPath: '/v1/summary' },
     included: ['Compact Market Board', 'one recommendedNextAction', 'own commercial signals for core sales services'] };

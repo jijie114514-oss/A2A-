@@ -80,6 +80,9 @@ test('Test 5: one free revision: no refund, no recharge, one-time only, no extra
   assert.ok(rev.revision.pieces.length > 0); assert.equal(app.wallet(buyer).balance, balance);
   assert.equal(boardRow(app.store.read(), 'star-a').fanSupport, 5, 'revision must not add Fan Support');
   assert.equal(app.store.read().orders.filter(o => o.buyerId === buyer.id && o.status === 'delivered').length, 1, 'no new paid order');
+  // 修订用完后，退款回执不能再宣告 remedy（否则买家 agent 照着调会拿到 409 revision_used）
+  const after = await app.refund(buyer, order.id, { reason: '还是想退款' });
+  assert.equal(after.decision, 'DECLINED'); assert.equal(after.remedy, null); assert.equal(after.revisionAvailable, false);
   const replay = await app.revisionRequest(buyer, order.id, { notes: '风格更简洁一些' }, 'rev-1');
   assert.equal(replay.replayed, true); assert.equal(replay.revision.id, rev.revision.id);
   assert.equal(app.wallet(buyer).balance, balance);
