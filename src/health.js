@@ -9,7 +9,8 @@ import { VERSION } from './catalog.js';
 /** 把订单映射为一次 generation 样本（requestId/timestamp/version/mode/耗时/原因）。 */
 export function generationSamples(orders, serviceId) {
   return orders
-    .filter(o => o.service === serviceId && o.status === 'delivered' && Array.isArray(o.delivery?.pieces) && o.delivery.pieces.some(p => p.service === serviceId || (p.kind === 'ad' && p.service === serviceId)))
+    // 已退款的单子仍然是一次真实的 generation 样本：不算进来，降级信号会自己消失。
+    .filter(o => o.service === serviceId && ['delivered', 'refunded'].includes(o.status) && Array.isArray(o.delivery?.pieces) && o.delivery.pieces.some(p => p.service === serviceId || (p.kind === 'ad' && p.service === serviceId)))
     .map(o => {
       const piece = o.delivery.pieces.find(p => p.service === serviceId) || o.delivery.pieces[0];
       const g = piece?.generation || {};

@@ -6,6 +6,19 @@ const fields = {
   'sales-stress-test': ['topObjections', 'whyBuyerMayObject', 'severity', 'recommendedResponses', 'whatToFixBeforeSelling'],
   'deal-coach': ['nextMessage', 'strategy', 'recommendedCounteroffer', 'concessionLevel', 'walkAwayCondition', 'risk'],
 };
+/** 退出条件的语义必须分清方向：预算上限是买方规则，底价下限是卖方规则。
+ *  两组数字同时给时（中间人视角）不能只说「高于X退出、低于Y退出」——预算=底价时要明确只有一个可行点。 */
+function walkAwayOf(input) {
+  const { budget, minimumAcceptablePrice: floor } = input;
+  const parts = ['未确认交付范围与验收条件则暂停，不视为成交'];
+  if (budget !== undefined && floor !== undefined) {
+    if (floor > budget) parts.push(`可行区间不存在：预算 ${budget} 低于可接受底价 ${floor}，必须有一方调整边界才能继续`);
+    else if (floor === budget) parts.push(`可行区间只有 ${budget} 积分这一点：偏离即退出`);
+    else parts.push(`买方视角：高于预算 ${budget} 积分则退出；卖方视角：低于底价 ${floor} 积分则退出（输入同时给了两组数字，分别对应两个方向）`);
+  } else if (budget !== undefined) parts.push(`高于预算 ${budget} 积分则退出（买方视角）`);
+  else if (floor !== undefined) parts.push(`低于底价 ${floor} 积分则退出（卖方视角）`);
+  return parts.join('；') + '。';
+}
 export function localSales(service, input) {
   const material = [...new Set([input.productDescription, input.context, input.goal].filter(Boolean))].join('；') || input.counterpartyMessage || '当前交易';
   const name = input.productName || '这项服务';
@@ -26,7 +39,7 @@ export function localSales(service, input) {
     work = { nextMessage: possible ? `关于本次交易，请先确认交付范围与验收标准。${proposal === null ? '价格信息尚缺，请提供报价。' : `建议以${proposal}积分为讨论报价，请确认是否接受；确认之前不视为成交。`}` : '当前预算低于最低可接受价格，没有可行价格区间。本次先暂停，只有重新授权价格边界后再谈。',
       strategy: `本次目标与材料：${material}。${input.counterpartyMessage ? `对方原话（用户提供、未核验）：「${input.counterpartyMessage}」。` : ''}先核对范围，再提出条件交换；任何范围变化需要双方确认。`,
       recommendedCounteroffer: proposal, concessionLevel: proposal === null || proposal === input.currentOffer ? 'NONE' : 'WITHIN_AUTHORIZED_BOUNDS',
-      walkAwayCondition: `未确认交付及验收条件则暂停。${input.budget !== undefined ? `高于预算${input.budget}积分则退出。` : ''}${input.minimumAcceptablePrice !== undefined ? `低于底价${input.minimumAcceptablePrice}积分则退出。` : ''}`,
+      walkAwayCondition: walkAwayOf(input),
       risk: '报价只是建议，未发生交易；未提供的功能、退款政策、修订次数和对方决定均不作承诺。' };
   }
   return finish(service, work, input);
@@ -87,9 +100,19 @@ export function normalizeSales(source, service, input) {
     const literal = String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     return new RegExp(`(?<![\\d.])${literal}(?![\\d.])\\s*${CONNECTOR}\\s*(?:${UNIT})`, 'i');
   };
+  // 输入里出现过的金额都算「提供过」：预算、对方报价、底价都写在 context/字段里，
+  // 模型在正文引用它们是正确行为，不是「自行添加报价」。
+  const providedAmounts = new Set();
+  for (const value of Object.values(input)) {
+    if (typeof value === 'number' && Number.isFinite(value)) providedAmounts.add(value);
+    if (typeof value === 'string') for (const match of value.matchAll(new RegExp(`(?<![\\d.])(\\d+(?:\\.\\d+)?)(?![\\d.])\\s*(?:${UNIT})`, 'gi'))) providedAmounts.add(Number(match[1]));
+  }
   if (input.price !== undefined) {
     valid(priceReference(input.price).test(body), `需要在实际正文使用输入的价格及积分单位（例如「${input.price} 积分」或「${input.price} 分」）`);
-    for (const match of body.matchAll(new RegExp(`(\\d+(?:\\.\\d+)?)\\s*${CONNECTOR}\\s*(?:${UNIT})`, 'gi'))) valid(Number(match[1]) === input.price, '不得自行添加未提供的积分报价或折扣');
+    for (const match of body.matchAll(new RegExp(`(\\d+(?:\\.\\d+)?)\\s*${CONNECTOR}\\s*(?:${UNIT})`, 'gi'))) {
+      const amount = Number(match[1]);
+      valid(amount === input.price || providedAmounts.has(amount), `不得自行添加未提供的积分报价或折扣（正文出现 ${match[0]}，输入里没有这个金额）`);
+    }
   }
   // 产品名/价格必须真的出现在交付里，但空格与大小写不该成为失败原因：
   // 输入「MCP 自检」而模型写「MCP自检」是在使用同一个名字，不是没用。

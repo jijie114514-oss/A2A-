@@ -45,7 +45,8 @@ test('Test A: one live request increments currentVersion and recent', async t =>
 test('Test B: an induced fallback increments fallback and records internalReason', async t => {
   const { app } = await setup(t, fixtureBrain(() => fallbackGen('model_timeout')));
   const order = await app.order(buyer, pitch, 'fb-1');
-  assert.equal(order.status, 'delivered');
+  // 备用交付不收费：订单变 refunded，但它在健康统计里仍然是一次 fallback 样本
+  assert.equal(order.status, 'refunded'); assert.equal(order.refundReason, 'FALLBACK_NOT_CHARGED'); assert.equal(order.chargedCredits, 0);
   const h = app.salesPitchHealth();
   assert.equal(h.currentVersion.total, 1); assert.equal(h.currentVersion.fallback, 1); assert.equal(h.currentVersion.live, 0);
   assert.equal(h.currentVersion.fallbackReasons.MODEL_TIMEOUT, 1);

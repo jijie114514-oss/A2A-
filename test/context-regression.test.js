@@ -102,7 +102,9 @@ test('duet propagates context to both stars; health attributes each child separa
   const app = await StarHall.open(config({ STARHALL_DATA_DIR: dir }), brain); t.after(() => app.close());
   const input = { description: '卖诗、吐槽和谈判的平台', theme: '回应质疑', recipient: 'StarHall', context: '三种服务由不同明星提供' };
   const order = await app.order({ id: 'fan-orion' }, { service: 'duet', input }, 'duet');
-  assert.equal(order.status, 'delivered'); assert.equal(received.length, 2);
+  // 套餐里只要有一段是备用交付，整单不收费（退款），但两段作品都照发
+  assert.equal(order.status, 'refunded'); assert.equal(order.refundReason, 'FALLBACK_NOT_CHARGED');
+  assert.equal(order.delivery.pieces.length, 2); assert.equal(received.length, 2);
   for (const call of received) assert.equal(call.input.context, input.context);
   assert.equal(received[1].input.stance, 'defend'); assert.ok(received[1].input.critique);
   assert.equal(order.shoutout, order.delivery.shoutout); assert.ok(order.shoutout.includes('8分'));

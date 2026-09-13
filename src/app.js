@@ -30,8 +30,8 @@ export class StarHall {
   catalog() {
     const output = catalog(this.store.mode || 'local');
     const orders = this.store.read().orders;
-    output.deliveryPolicy = { fallbackEnabled: this.brain.options?.fallback ?? false, fallbackCharged: true,
-      explanation: '备用作品会明确标记并按目录价收费；失败订单不扣款。健康状态依据当前目录的最近订单，不保证未来请求成功。',
+    output.deliveryPolicy = { fallbackEnabled: this.brain.options?.fallback ?? false, fallbackCharged: false,
+      explanation: '模型未完成合格输出时，交付会明确标记 generation.mode=fallback；这类付费单一律不收费（自动全额退款，作品保留），免费试用本就不扣分。失败订单同样不扣款。健康状态依据当前目录的最近订单，不保证未来请求成功。',
       refundPolicy: { mode: 'machine-verified',
         autoRefundReasons: [...REFUND_REASONS],
         subjective: { refundable: false, remedy: 'ONE_FREE_REVISION', maxRevisions: 1 },
@@ -58,7 +58,13 @@ export class StarHall {
       }
       const status = this.bridge.auditFailed ? 'unavailable' : counts.failed || counts.fallbackDelivered ? 'degraded'
         : counts.liveDelivered ? 'observed_live' : counts.mockDelivered ? 'mock_only' : 'unverified';
-      return { ...s, health: { status, ...counts, includesBundlePieces: true, includesTrials: true,
+      const fallbackReasons = {};
+      for (const order of recent) for (const piece of (order.delivery?.pieces || [])) {
+        if (piece.generation?.mode !== 'fallback') continue;
+        const key = piece.generation.internalReason || piece.generation.reason || 'UNKNOWN';
+        fallbackReasons[key] = (fallbackReasons[key] || 0) + 1;
+      }
+      return { ...s, health: { status, ...counts, fallbackReasons, includesBundlePieces: true, includesTrials: true,
         failedBundleAttribution: '失败套餐若未保存作品，不推断具体子服务故障', lastCompletedAt: recent.at(-1)?.completedAt || null } };
     };
     output.services = output.services.map(enrich);
@@ -181,9 +187,13 @@ export class StarHall {
         state.events.push({ type: 'order.delivered', orderId: order.id, traceId: ctx.traceId, at: completedAt });
         this.finishDelivery(state, order, before);
         const verdict = this.verifyDelivery(order, s);
+        const fellBack = args.pieces.some(p => p.generation?.mode === 'fallback');
         if (!verdict.ok) {
           if (order.kind === 'trial') { order.status = 'failed'; order.completedAt = completedAt; order.error = { code: 'machine_verification_failed', message: '机器验证未通过，免费试用未计入任何正式数据', refundReason: verdict.refundReason, checks: verdict.checks }; }
           else this.applyRefund(state, order, verdict.refundReason, 'automatic', null, ctx.traceId, verdict);
+        } else if (order.kind !== 'trial' && fellBack) {
+          // 机器可见的降级：模型没成功，就不该收钱。作品照发，全额退回，原因写进回执。
+          this.applyRefund(state, order, 'FALLBACK_NOT_CHARGED', 'automatic', null, ctx.traceId);
         }
         return order;
       });
@@ -394,12 +404,20 @@ export class StarHall {
   publicOrder(order) {
     const { key, fingerprint, ...safe } = order;
     const revision = order.delivery?.revision || null;
+    // 顶层标记，别让买家翻 pieces 才知道拿到的是模板还是真实模型输出。
+    const modes = (order.delivery?.pieces || []).map(p => p.generation?.mode).filter(Boolean);
+    const deliveryMode = modes.length ? (new Set(modes).size === 1 ? modes[0] : 'mixed') : (order.delivery?.ad ? 'instant' : null);
+    const notice = deliveryMode === 'fallback'
+      ? (order.kind === 'trial'
+        ? '模型未完成合格输出，已交付本地备用作品；免费试用，0 花费。'
+        : '模型未完成合格输出，已交付本地备用作品；本单不收费（已自动全额退款），作品留给你参考。')
+      : null;
     const contentPaid = order.status === 'delivered' && !order.delivery?.ad && order.kind === 'paid';
     const charged = order.status === 'delivered' ? order.price : 0;
     const refunded = order.status === 'refunded' || Boolean(order.refund?.refundApplied);
     const deliveryStatus = refunded ? 'REFUNDED' : order.status === 'failed' ? 'FAILED' : order.status === 'pending' ? 'PAID'
       : revision?.used ? 'REVISION_USED' : contentPaid ? 'REVISION_AVAILABLE' : 'DELIVERED';
-    return { ...safe, deliveryStatus, refundEligible: refunded, refundApplied: Boolean(order.refund?.refundApplied),
+    return { ...safe, deliveryMode, ...(notice ? { notice } : {}), deliveryStatus, refundEligible: refunded, refundApplied: Boolean(order.refund?.refundApplied),
       refundReason: order.refund?.refundReason || null, refundedAt: order.refundedAt || null, refundSource: order.refund?.source || null,
       revisionAvailable: Boolean(contentPaid && !revision?.used), revisionUsed: Boolean(revision?.used),
       revisionId: revision?.revisionId || null, remedy: contentPaid && !revision?.used ? 'ONE_FREE_REVISION' : null,

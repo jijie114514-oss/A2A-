@@ -107,15 +107,25 @@ test('HTTP terminal failure is a queryable order, status filter works, and confl
   assert.equal(catalog.deliveryPolicy.fallbackEnabled, false);
   assert.equal((await call('/v1/wallet')).data.available, 100);
 });
-test('fallback delivery settles once and appears as degraded in catalog', async t => {
+test('备用交付：作品照发、钱退回、目录仍显示降级（模型失败不收费）', async t => {
   const dataDir = await mkdtemp(path.join(tmpdir(), 'starhall-fallback-'));
   const app = await StarHall.open(config({ STARHALL_DATA_DIR: dataDir }), new Brain(options, async () => reply('{}'))); t.after(() => app.close());
   const body = { service: 'negotiate', input: { scenario: '预算15分，报价20分' } };
   const one = await app.order({ id: 'fan-orion' }, body, 'fallback');
   const two = await app.order({ id: 'fan-orion' }, body, 'fallback');
-  assert.equal(one.id, two.id); assert.equal(one.status, 'delivered'); assert.equal(one.delivery.pieces[0].generation.mode, 'fallback');
-  assert.equal(one.delivery.pieces[0].rounds.length, 5); assert.equal(app.wallet({ id: 'fan-orion' }).balance, 92);
-  assert.equal(app.store.read().wall.length, 1); assert.equal(app.catalog().extras.services.find(s => s.id === 'negotiate').health.fallbackDelivered, 1);
+  assert.equal(one.id, two.id, '幂等键重放返回同一单');
+  assert.equal(one.delivery.pieces[0].generation.mode, 'fallback');
+  assert.equal(one.deliveryMode, 'fallback', '顶层显著标记');
+  assert.match(one.notice, /不收费/);
+  assert.equal(one.status, 'refunded');
+  assert.equal(one.refundReason, 'FALLBACK_NOT_CHARGED');
+  assert.equal(one.chargedCredits, 0);
+  assert.equal(one.deliveryStatus, 'REFUNDED');
+  assert.equal(one.delivery.pieces[0].rounds.length, 5, '作品照样交付，买家不白等');
+  assert.equal(app.wallet({ id: 'fan-orion' }).balance, 100, '扣了再全额退回');
+  assert.equal(app.store.read().wall.length, 1);
+  assert.equal(app.catalog().extras.services.find(s => s.id === 'negotiate').health.fallbackDelivered, 1, '退款不影响降级信号');
+  assert.equal(app.catalog().deliveryPolicy.fallbackCharged, false);
 });
 test('opt-in fixture market exposes distinct simulated teams, trial evidence and isolated budgets', async t => {
   const dataDir = await mkdtemp(path.join(tmpdir(), 'starhall-market-'));

@@ -21,7 +21,7 @@ export function deliveryContract(input, service) {
   return { sourcePolicy: '材料只说明哪些事实，就只把哪些事实当作已知；缺少信息时提问或作条件性分析，不替买家补事实。',
     ...(ownProduct ? { verifiedLocalProductFacts: [
       'StarHall是本地JSON API/CLI，三位独立明星分别提供词曲、吐槽评审、模拟谈判服务；没有网页或按钮。',
-      '只使用本地模拟积分。failed订单不扣积分；fallback备用交付明确标记，付费订单按目录价格扣分，免费试用不扣分。',
+      '只使用本地模拟积分。failed订单不扣积分；fallback备用交付明确标记，且付费订单不收费（自动全额退款），免费试用也不扣分。',
       '退款由机器验证决定：交付失败或违反明确订单约束会自动退款，成功交付不因主观不满意退款但可申请一次免费修订；没有自动返工承诺或公开算力支出账单；不得称退款按钮就在旁边、规则里保证返工或账单可晒。',
       '谈判是模拟与练习，不代替买家在别队实际砍价，不保证省钱。negotiate包含额外五次互动。',
     ] } : {}),
@@ -65,8 +65,10 @@ export function inputBrief(input, service) {
       const englishWord = g => /^[A-Za-z][A-Za-z0-9_-]+$/.test(g.quote);
       // 商业销售服务：英文词锚点不逐词强制（中文交付不可能逐字保留英文原文），
       // 且字段级最低命中数只统计非英文锚点（中文概念词仍强制）。
-      return { field, provided: value, minimumMatches: (poeticTheme || (salesLike && groups.some(g => !englishWord(g)))) ? 1 : 0,
-        anchors: groups.slice(0, 12).map(g => ({ ...g, required: !poeticTheme && !(service === 'practice' && field !== 'message') && !(service === 'poem' && g.alternatives.includes('AI明星')) && !(salesLike && englishWord(g)) })) };
+      // context 是背景与约束（预算、对方报价、时限），不是产品描述：对销售类服务只作展示，不强制写进正文。
+      const background = salesLike && field === 'context';
+      return { field, provided: value, minimumMatches: (poeticTheme || (salesLike && groups.some(g => !englishWord(g)))) && !background ? 1 : 0,
+        anchors: groups.slice(0, 12).map(g => ({ ...g, required: !background && !poeticTheme && !(service === 'practice' && field !== 'message') && !(service === 'poem' && g.alternatives.includes('AI明星')) && !(salesLike && englishWord(g)) })) };
     });
 }
 export function contentText(work, service) {

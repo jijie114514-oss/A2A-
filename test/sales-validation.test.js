@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeSales } from '../src/sales.js';
+import { normalizeSales, localSales } from '../src/sales.js';
 
 /** 输入用真实验收时那一单：产品名带空格、价格是数字。 */
 const input = { productName: 'MCP 自检', productDescription: '通过官方 MCP SDK 从公网串流 HTTP 调用', price: 9, targetBuyer: 'agents' };
@@ -73,4 +73,41 @@ test('sales-stress-test 用同一套价格与产品名规则', () => {
   assert.equal(normalizeSales(stress, 'sales-stress-test', stressInput).work.evidenceType, 'SIMULATED');
   try { normalizeSales({ ...stress, recommendedResponses: ['报价 12 积分即可', '先对齐验收条件再确认'] }, 'sales-stress-test', stressInput); assert.fail('应当拒绝'); }
   catch (error) { assert.match(error.message, /不得自行添加未提供的积分报价或折扣/); }
+});
+
+// ── 以下两个用例来自 2026-09-13 真实买方 Pi agent 的失败回执（逐字输入） ──────────
+test('输入里给过的金额（预算/对方报价）可以在正文引用，不算「自行添加报价」', () => {
+  const buyerInput = { productName: 'CodeLens', targetBuyer: '参加竞赛的 coding agent 团队',
+    productDescription: '代码审查服务：输入代码或仓库片段，输出带文件位置与行号的审查报告（风险清单 + 修复建议）。单次 20 积分，交付 <2 分钟。',
+    price: 20, context: '付费复现：我是买方 agent，正在为本队采购代码审查服务；预算 15 积分，卖方报价 20 积分，可减少一次修订次数。' };
+  const body = { oneLinePitch: 'CodeLens：代码审查服务，20 积分/次。',
+    shortPitch: '面向 coding agent 团队的 CodeLens，20 积分/次，交付 <2 分钟。我们的预算是 15 积分，你方报价 20 积分——能否在原约定基础上减少一次修订来接近预算？',
+    keyValuePoints: ['单次 20 积分，输出带位置与修复建议', '可在 15 积分预算内讨论缩小范围'],
+    callToAction: '请确认能否在 15 积分预算内缩范围，或保留 20 积分并减少一次修订。' };
+  const { work } = normalizeSales(body, 'sales-pitch', buyerInput);
+  assert.equal(work.shortPitch, body.shortPitch, '引用输入里的预算/对方报价不该被判失败');
+  // 凭空冒出来的金额仍然拒绝
+  rejects(pitch({ keyValuePoints: ['单次 20 积分', '加 3 积分可加急'], shortPitch: 'CodeLens 20 积分一次。' }),
+    /不得自行添加未提供的积分报价或折扣/, { ...buyerInput, price: 20 });
+});
+
+test('context 是背景与约束，不是产品描述：销售类服务不再强制把 context 词写进正文', () => {
+  const buyerInput = { productName: 'CodeLens', productDescription: '代码审查服务', price: 20,
+    context: '预算 15 积分，对方报价 20 积分，修订次数待确认' };
+  const body = { oneLinePitch: 'CodeLens：代码审查服务，20 积分一次。',
+    shortPitch: '面向团队的 CodeLens，20 积分一次，先给一个真实片段验证再采购。',
+    keyValuePoints: ['20 积分一次，输出问题位置与修复建议', '交付 <2 分钟'],
+    callToAction: '发一个真实片段，我按 20 积分交付并把验收标准写清楚。' };
+  const { work } = normalizeSales(body, 'sales-pitch', buyerInput);
+  const field = work.inputComparison.fields.find(f => f.field === 'context');
+  if (field) assert.equal(field.points.every(p => !p.required), true, 'context 锚点必须是非必填（否则模型只能把背景抄进正文）');
+});
+
+test('deal-coach 退出条件分方向：预算=底价时只说「只有一个可行点」', () => {
+  const both = localSales('deal-coach', { budget: 15, minimumAcceptablePrice: 15, currentOffer: 20, counterpartyMessage: '不降价' });
+  assert.match(both.walkAwayCondition, /可行区间只有 15 积分这一点/);
+  assert.ok(!/高于预算15积分则退出/.test(both.walkAwayCondition), '预算=底价时不能同时给出两个相反边界');
+  assert.match(localSales('deal-coach', { budget: 15 }).walkAwayCondition, /买方视角/);
+  assert.match(localSales('deal-coach', { minimumAcceptablePrice: 12 }).walkAwayCondition, /卖方视角/);
+  assert.match(localSales('deal-coach', { budget: 10, minimumAcceptablePrice: 15 }).walkAwayCondition, /可行区间不存在/);
 });
