@@ -40,12 +40,22 @@ const SEAT = payload.member_id || process.env.SHAREDNET_MEMBER_ID || '';
 // 点名 = 提到产品名/榜单/我们的 seat，或这条消息是对我们自己消息的回复。
 const state0 = (() => { try { return JSON.parse(readFileSync(path.resolve('artifacts/room-agent-state.json'), 'utf8')); } catch { return {}; } })();
 const ownIds = new Set(state0.lastMessageIds || []);
-// 只回三种：① 直接 @我们；② 明确在点评/质疑我们；③ 回复我们自己的消息。
-// （宽松关键词会把「提到 StarHall」的监控榜单、别人的随口提及都算进来，回复变噪声）
+// 只回四种：① 直接 @我们；② 明确在点评/质疑我们；③ 提到我们的产品且在提问/求操作（且没 @ 别家 agent）；④ 回复我们自己的消息。
+// （宽松关键词会把「提到 StarHall」的监控榜单、别人的随口提及都算进来，回复变噪声；③ 只补真买家漏答）
 const DIRECT = new RegExp('@\\s*(starhall|星辉舞台|i_D7Ss2Iofeo)' + (SEAT && SEAT !== 'i_D7Ss2Iofeo' ? `|@\\s*${SEAT}` : ''), 'i');
 const ABOUT_US = /(?:review|点评|评价|批评|质疑|回应|答复)\s*[—–\-:：]?\s*(?:starhall|星辉舞台)|starhall\s*(?:的|的广告|广告|榜单|赞助|交付|试用|回执|证据)|星辉舞台的|你们(?:的)?(?:广告|榜单|赞助位|交付|试用|回执)/i;
+const OUR_TERMS = /starhall|星辉|star ?hall|market-?board|行情榜|sales pitch|stress test|deal coach|commercial diagnostic/i;
+const ASK = /[?？]|吗|呢|请问|怎么|如何|多少|能否|能不能|可不可以|是否|有没有|what|how much|how do|how can|does|do you|can you|would you|could you|tell me|price|cost|trial|价格|报价|试用|下单|购买/i;
+// 已经 @ 了别家 agent 的消息（例如别人向 Veritas/GovStake 提问时顺带提我们）不抢答。
+const OTHER_TAG = /@\s*(?!starhall|星辉|i_D7Ss2Iofeo)[A-Za-z0-9_.\-]{2,}/i;
 const SPAM = /play_jackpot|GovStake Casino|To use GovStake, send|insufficient .{0,12}balance/i;
-const addressedToUs = m => !SPAM.test(String(m.content || '')) && (DIRECT.test(String(m.content || '')) || ABOUT_US.test(String(m.content || '')) || (m.reply_to_message_id && ownIds.has(m.reply_to_message_id)));
+const addressedToUs = m => {
+  const text = String(m.content || '');
+  if (SPAM.test(text)) return false;
+  if (DIRECT.test(text) || ABOUT_US.test(text)) return true;
+  if (OUR_TERMS.test(text) && ASK.test(text) && !OTHER_TAG.test(text)) return true;
+  return Boolean(m.reply_to_message_id && ownIds.has(m.reply_to_message_id));
+};
 const incoming = (payload.messages || []).filter(m => m?.content && m.sender_instance_id !== SEAT && addressedToUs(m));
 const ignored = (payload.messages || []).filter(m => m?.content && m.sender_instance_id !== SEAT && !addressedToUs(m));
 if (ignored.length && !quiet) out(`（跳过未点名消息 ${ignored.length} 条）`);
