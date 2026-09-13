@@ -7,7 +7,7 @@ import { fixtureMarket } from './arena.js';
 import { VERSION } from './catalog.js';
 import { createMcpServer, toolDefinitions } from './mcp.js';
 import { buildAgentCard } from './agent-card.js';
-import { indexHtml, indexJson, HTML_HEADERS } from './landing.js';
+import { indexHtml, indexJson, explainHtml, HTML_HEADERS } from './landing.js';
 import { evidenceOf } from './evidence.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 
@@ -24,6 +24,15 @@ export async function bodyOf(req) {
   let size = 0; const chunks = [];
   for await (const chunk of req) { size += chunk.length; ensure(size <= 32768, 'body_too_large', '请求不得超过32KB', 413); chunks.push(chunk); }
   try { return JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { throw new AppError('invalid_json', '无效的 JSON', 400); }
+}
+
+/** 只写入口被浏览器点到（Accept: text/html）时返回解释页，而不是让人以为是鉴权问题。 */
+function explainWriteOnly(req, res, { path, allow, example, returns, note, base }) {
+  if (!String(req.headers.accept || '').includes('text/html')) return false;
+  const html = explainHtml({ path, allow, example, returns, note, base });
+  res.writeHead(405, { allow, 'content-type': 'text/html; charset=utf-8', ...HTML_HEADERS });
+  res.end(html);
+  return true;
 }
 
 /** 把路由体抽成纯 handler：本地 http.createServer 与 Vercel (`api/index.js`) 共用同一份逻辑。 */
@@ -65,7 +74,13 @@ export function createHandler(app, options) {
       }
       // MCP streamable HTTP：无状态，每次请求一个 server，不保留会话。/api/mcp 是业界常用别名。
       if (url.pathname === '/mcp' || url.pathname === '/api/mcp') {
-        if (method !== 'POST') { res.writeHead(405, { allow: 'POST', 'content-type': 'application/json; charset=utf-8' }); return res.end(JSON.stringify({ error: { code: 'method_not_allowed', message: 'MCP streamable HTTP 只接受 POST；本部署无状态，不提供 GET SSE 与 DELETE 会话' } })); }
+        if (method !== 'POST') {
+          if (explainWriteOnly(req, res, { path: '/mcp', allow: 'POST', base: options.publicBaseUrl || '',
+            note: 'MCP streamable HTTP 只接受 POST；本部署无状态，不提供 GET SSE 与 DELETE 会话。',
+            example: `curl -X POST {base}/mcp -H 'content-type: application/json' -H 'accept: application/json, text/event-stream' \\\n  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'`,
+            returns: 'JSON-RPC；tools/list 返回 19 个工具，tools/call 直接调用（免费工具不需要 token）。' })) return;
+          res.writeHead(405, { allow: 'POST', 'content-type': 'application/json; charset=utf-8' }); return res.end(JSON.stringify({ error: { code: 'method_not_allowed', message: 'MCP streamable HTTP 只接受 POST；本部署无状态，不提供 GET SSE 与 DELETE 会话' } }));
+        }
         const body = await bodyOf(req);
         const mcp = createMcpServer(app, { openRegistration: options.openRegistration, token: options.mcpToken, registrationCredits: options.registrationCredits });
         const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
@@ -94,12 +109,14 @@ export function createHandler(app, options) {
       const actor = auth ? app.authenticate(auth.startsWith('Bearer ') ? auth.slice(7) : '') : null;
       if (url.pathname === '/v1/agents' && method !== 'POST') {
         // 浏览器点开这个链接的人（评委/队友）应该看到「怎么调」，而不是一句 401。
-        res.writeHead(405, { allow: 'POST', 'content-type': 'application/json; charset=utf-8' });
         const base = options.publicBaseUrl || '';
-        return res.end(JSON.stringify({ error: { code: 'method_not_allowed', message: '自助开户只接受 POST（浏览器直接打开是 GET）' },
-          howTo: `curl -X POST ${base}/v1/agents -H 'content-type: application/json' -d '{"handle":"your-agent","name":"Your Agent","secret":"<16 字符以上，自行保管>"}'`,
-          returns: '201 { buyerId, token, balance }；token 只返回一次，之后用它调 /v1/orders 与 /v1/trials。',
-          documentation: `${base}/agent-card.json` }));
+        const example = `curl -X POST {base}/v1/agents -H 'content-type: application/json' \\\n  -d '{"handle":"your-agent","name":"Your Agent","secret":"<16 字符以上，自行保管>"}'`;
+        const returns = '201 { buyerId, token, balance }；token 只返回一次，之后用它调 /v1/orders 与 /v1/trials。';
+        const note = '自助开户只接受 POST；浏览器直接打开是 GET，所以不会替你开户。';
+        if (explainWriteOnly(req, res, { path: '/v1/agents', allow: 'POST', example, returns, note, base })) return;
+        res.writeHead(405, { allow: 'POST', 'content-type': 'application/json; charset=utf-8' });
+        return res.end(JSON.stringify({ error: { code: 'method_not_allowed', message: note },
+          howTo: example.replace('{base}', base), returns, documentation: `${base}/agent-card.json` }));
       }
       if (method === 'POST' && url.pathname === '/v1/agents') {
         ensure(options.openRegistration, 'registration_closed', '本部署未开放自助开户，请通过运营方获取 token', 403);

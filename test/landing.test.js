@@ -39,6 +39,19 @@ test('root 门厅：JSON / HTML 双形态、转义、favicon，且不影响鉴�
   assert.ok(!after.includes('<img src=x'), '买家名里的 HTML 必须被转义');
   assert.match(after, /&lt;img src=x/);
 
+  // 只写入口不能被「点」：浏览器拿解释页，agent 拿结构化 405
+  assert.ok(!/href="[^"]*\/v1\/agents"/.test(page), '门厅里 POST 行不能是可点击链接');
+  assert.ok(!/href="[^"]*\/mcp"/.test(page), 'MCP 是 POST，门厅里也不能是链接');
+  assert.match(page, /curl -X POST/);
+  const clicked = await fetch(host.url + '/v1/agents', { headers: { accept: 'text/html' } });
+  assert.equal(clicked.status, 405);
+  assert.equal(clicked.headers.get('allow'), 'POST');
+  const explain = await clicked.text();
+  assert.match(explain, /这个入口不能点/);
+  assert.match(explain, /curl -X POST/);
+  assert.match(explain, /回 StarHall 门厅/);
+  assert.equal((await fetch(host.url + '/mcp', { headers: { accept: 'text/html' } })).status, 405);
+
   // 其余契约不变
   assert.equal((await fetch(host.url + '/favicon.ico')).status, 204);
   assert.equal((await fetch(host.url + '/v1/wallet')).status, 401);
