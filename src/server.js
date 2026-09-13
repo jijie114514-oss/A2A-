@@ -93,6 +93,7 @@ export function createHandler(app, options) {
         const dbReady = await app.store.probe();
         return send(200, { status: app.bridge.auditFailed || app.projectionFailed || !dbReady ? 'degraded' : 'ok', product: 'StarHall', version: VERSION,
           mode: options.mode || 'local', store: app.store.store, dataSet: app.store.dataSet ?? null, dbReady, round: app.catalog().round.id,
+          writeConflicts: app.store.writeConflicts ?? 0,
           kernel: '@aicoo/sharedos@0.1.0-alpha.5', provider: options.llm.provider, fallbackEnabled: options.llm.fallback,
           projectionsReady: !app.projectionFailed,
           mcp: { transport: 'streamable-http', path: '/mcp' }, registration: { open: Boolean(options.openRegistration), path: '/v1/agents', credits: options.registrationCredits }, publicBaseUrl: options.publicBaseUrl || null });

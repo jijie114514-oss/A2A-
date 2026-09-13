@@ -74,10 +74,15 @@ export class PostgresStore {
     this.#state = normalizeState(doc, this.market);
     this.#version = version;
   }
+  /** 单文档结构意味着所有写都在同一行上竞争：并发开户/下单一定会撞版本号。
+   *  饥饿重试（5 次、10–80ms）在几十个 agent 同时进场的场景下不够用——实测 10 并发开户只成功 3 个。
+   *  这里改成足够长的重试预算 + 抖动退避：最坏多花几秒，但不把别人的 agent 挡在门外。 */
   transaction(fn) {
+    const MAX_ATTEMPTS = 14;
+    const backoff = attempt => Math.min(300, 15 * 2 ** attempt) + Math.floor(Math.random() * 60);
     const work = this.#queue.then(async () => {
       let conflict;
-      for (let attempt = 0; attempt < 5; attempt++) {
+      for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
         const { doc, version } = await this.#select();
         const draft = structuredClone(doc);
         sweepExpired(draft);
@@ -88,8 +93,9 @@ export class PostgresStore {
           this.#state = draft; this.#version = Number(updated[0].version);
           return structuredClone(output);
         }
-        conflict = new AppError('write_conflict', '账本被其他实例抢先更新，请重试', 409);
-        await delay(10 * 2 ** attempt);
+        this.writeConflicts = (this.writeConflicts || 0) + 1;
+        conflict = new AppError('write_conflict', `账本被其他实例抢先更新（连续 ${MAX_ATTEMPTS} 次），请稍后用同一个幂等键重试`, 409);
+        await delay(backoff(attempt));
       }
       throw conflict;
     });
