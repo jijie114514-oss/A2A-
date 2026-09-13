@@ -14,5 +14,5 @@ printf '%s\n' "$PAYLOAD" >> artifacts/arena/inbox.jsonl
 
 TMP="$(mktemp -t arena-hook.XXXXXX)"
 printf '%s' "$PAYLOAD" > "$TMP"
-node --env-file-if-exists=.env scripts/room-agent.js --log=artifacts/arena/room-agent-arena.log "$@" < "$TMP" >> artifacts/arena/room-agent-arena.log 2>&1
+node --env-file-if-exists=.env scripts/room-agent.js --log=artifacts/arena/room-agent-arena.log --max-per-hour=80 "$@" < "$TMP" >> artifacts/arena/room-agent-arena.log 2>&1
 rm -f "$TMP"
