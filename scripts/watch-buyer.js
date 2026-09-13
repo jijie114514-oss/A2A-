@@ -33,32 +33,34 @@ function check() {
   const inbound = items.filter(t => t.to_principal_id === own);
   const grants = inbound.filter(t => !t.from_principal_id).reduce((s, t) => s + t.amount, 0);
   const spent = outbound.reduce((s, t) => s + t.amount, 0);
-  // 入账里只有「有其他队伍 principal 的转账」才算退款；平台发放（from=null，如 code=HACK100）不是退款。
-  const refunded = inbound.filter(t => t.from_principal_id).reduce((s, t) => s + t.amount, 0);
   const bySeller = {};
   for (const t of outbound) bySeller[t.to_principal_id] = (bySeller[t.to_principal_id] || 0) + t.amount;
+  // 入账里：来自我们付过款的卖方 = 退款（不计成功消费）；来自其他队 = 营业收入（广告/服务）。
+  const refunded = inbound.filter(t => t.from_principal_id && bySeller[t.from_principal_id]).reduce((s, t) => s + t.amount, 0);
+  const revenue = inbound.filter(t => t.from_principal_id && !bySeller[t.from_principal_id]).reduce((s, t) => s + t.amount, 0);
   const products = [...new Set(outbound.map(t => /StarHall r2 ([^\s(]+)/.exec(t.memo || '')?.[1]?.replace(/-\d+$/, '')).filter(Boolean))];
   const sellers = Object.keys(bySeller);
   const net = spent - refunded;
   const met = net >= 80 && sellers.length >= 3 && products.length >= 3;
   const overCap = Object.entries(bySeller).filter(([, a]) => a > 30).map(([p, a]) => `${TEAMS[p] || p}:${a}`);
-  const row = { at: new Date().toISOString(), balance: balance.balance ?? null, granted: balance.granted ?? grants, spent, refunded, net, sellers: sellers.length, products: products.length, bySeller, productList: products, met, overCap };
+  const row = { at: new Date().toISOString(), balance: balance.balance ?? null, granted: balance.granted ?? grants, spent, refunded, revenue, net, sellers: sellers.length, products: products.length, bySeller, productList: products, met, overCap };
   mkdirSync(path.dirname(logFile), { recursive: true });
   appendFileSync(logFile, JSON.stringify(row) + '\n');
   writeFileSync(snapFile, JSON.stringify(row, null, 1));
   const names = Object.entries(bySeller).map(([p, a]) => `${TEAMS[p] || p.slice(0, 10)}:${a}`).join(' ');
   const flag = overCap.length ? ` ⚠️单卖方超30偏好: ${overCap.join(' ')}` : '';
-  return { row, line: `[${row.at.slice(11, 19)}] 消费 ${spent}（净 ${net}）· 外队 ${sellers.length} · 产品 ${products.length} · 余 ${balance.balance ?? '?'}${refunded ? ` · 退款 ${refunded}` : ''} ${met ? '✅达标' : '⏳未达'} | ${names}${flag}` };
+  return { row, line: `[${row.at.slice(11, 19)}] 消费 ${spent}（净 ${net}）· 外队 ${sellers.length} · 产品 ${products.length} · 余 ${balance.balance ?? '?'}${refunded ? ` · 退款 ${refunded}` : ''}${revenue ? ` · 营收 ${revenue}` : ''} ${met ? '✅达标' : '⏳未达'} | ${names}${flag}` };
 }
 
 let last = '';
 for (;;) {
   try {
     const { row, line } = check();
-    const key = JSON.stringify([row.spent, row.refunded, row.balance, row.sellers, row.products]);
+    const key = JSON.stringify([row.spent, row.refunded, row.revenue, row.balance, row.sellers, row.products]);
     if (key !== last) {
       console.log(line);
       last = key;
+      if (row.revenue > 0) console.log(`💰 卖出 ${row.revenue} 分（真实营收到账）`);
       if (row.refunded > 0) console.log(`⚠️ 出现退款 ${row.refunded} 分（退款不计成功消费，需要补买）`);
       if (row.met && row.balance === 0) console.log('🏁 已达标且余额清零');
       else if (row.met && row.balance > 0) console.log(`ℹ️ 已达 80 分门槛，仍有余额 ${row.balance}（Arena 2 裁判要求花完则继续）`);
