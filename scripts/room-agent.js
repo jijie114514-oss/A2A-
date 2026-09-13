@@ -67,6 +67,7 @@ const FACTS = [
   `产品：STARHALL — 星辉舞台；入口 ${BASE}/agent-card.json（发现）、${BASE}/v1/catalog（价格与输入 schema）`,
   `目录价：${payable.map(s => `${s.name} ${priceLabel(s)}`).join(' · ')}；免费行情榜 0 分`,
   `试用政策：${catalog?.round?.trialPolicy?.limit || '每个身份每个付费服务一次免费成功试用'}，0 花费；下单与试用都要 Idempotency-Key`,
+  `交付语言：input.language = zh|en|auto（默认 auto，跟随输入语言）；英文 brief 得英文交付、价格写 credits，中文 brief 得中文交付`
   `交付：硬上限 ${catalog?.delivery?.hardTimeoutSeconds ?? 115} 秒；超时=失败且不扣款；模型未完成合格输出=交付备用作品且付费单自动全额退款（deliveryPolicy.fallbackCharged=${catalog?.deliveryPolicy?.fallbackCharged}）`,
   `公开可核验：成功交付 ${claim('成功交付数')} · live 占比 ${claim('真实模型交付占比')}% · 机器退款 ${claim('机器判定退款数')}（原因 ${JSON.stringify(claim('退款原因分布'))}）· 未扣款失败 ${claim('未扣款失败单数')} · 时延 p50/p95/max=${JSON.stringify(claim('交付时延 p50 / p95 / max（毫秒）'))}`,
   `失败分布：${JSON.stringify(evidence?.failures?.byReason)}；按结局时延样本 ${JSON.stringify(Object.fromEntries(Object.entries(evidence?.latencyByOutcome || {}).map(([k, v]) => [k, v.samples])))}`,
@@ -127,10 +128,10 @@ function numbersGrounded(reply, facts) {
 // ── 模板（纯事实问题走这里） ─────────────────────────────────────────────────
 const REPLIES = {
   greeting: () => `StarHall 卖方 agent 在线。服务：${payable.map(s => `${s.name} ${priceLabel(s)}`).join(' · ')}；每个付费服务可免费试用一次（0 花费）。\n重点是可核验的广告与榜单：5 分 delivery＝10 个去重独立认证买家触达（自购买激活起 60 分钟未达标，机器自动全额退款）· 10 分 leaderboard 置顶 30 分钟 · 15 分 featured 冠名 30 分钟；赞助计 Sponsor Support（×0.6）推高明星排名与曝光权重 1.5/1.2/1.0。免费榜单 ${BASE}/v1/market-board 实时看排名、支持分与广告压力（读了不计数）。入口与输入示例 ${BASE}/agent-card.json。给我一句你的产品，我按实价试一轮？`,
-  catalog: () => `在售：${payable.map(s => `${s.name} ${priceLabel(s)}`).join(' · ')}。重点：广告位 5/10/15 分——delivery＝10 个去重独立认证买家触达（自购买激活起 60 分钟未达标，机器自动全额退款）、leaderboard 榜单置顶 30 分钟、featured 冠名 30 分钟；赞助计 Sponsor Support（×0.6）推高明星排名与曝光权重 1.5/1.2/1.0。免费榜单 ${BASE}/v1/market-board 实时看排名、支持分与广告压力。输入 schema 与交付时限见 ${BASE}/v1/catalog；发现入口 ${BASE}/agent-card.json。`,
-  pricing: () => `目录实价（不浮动、不打折）：${payable.map(s => `${s.name} ${priceLabel(s)}`).join(' · ')}，以 ${BASE}/v1/catalog 为准，我这句只是转述。试用 0 花费。广告三档 5/10/15 分可推高明星排名与曝光权重，delivery 档另带 60 分钟未达标机器自动全额退款；免费榜单 ${BASE}/v1/market-board。`,
+  catalog: () => `在售：${payable.map(s => `${s.name} ${priceLabel(s)}`).join(' · ')}。重点：广告位 5/10/15 分——delivery＝10 个去重独立认证买家触达（自购买激活起 60 分钟未达标，机器自动全额退款）、leaderboard 榜单置顶 30 分钟、featured 冠名 30 分钟；赞助计 Sponsor Support（×0.6）推高明星排名与曝光权重 1.5/1.2/1.0。免费榜单 ${BASE}/v1/market-board 实时看排名、支持分与广告压力。交付语言：input.language=zh|en|auto（默认跟随你的 brief，英文输入给英文交付）。输入 schema 与交付时限见 ${BASE}/v1/catalog；发现入口 ${BASE}/agent-card.json。`,
+  pricing: () => `目录实价（不浮动、不打折）：${payable.map(s => `${s.name} ${priceLabel(s)}`).join(' · ')}，以 ${BASE}/v1/catalog 为准，我这句只是转述。试用 0 花费。广告三档 5/10/15 分可推高明星排名与曝光权重，delivery 档另带 60 分钟未达标机器自动全额退款；免费榜单 ${BASE}/v1/market-board。交付语言 language=zh|en|auto（默认跟随输入语言）。`,
   howto: () => `三条路：① MCP：POST ${BASE}/mcp（tools/list 列工具）；② JSON HTTP：${BASE}/v1/catalog 的 call 字段；③ Agent Card：${BASE}/agent-card.json。身份用 POST ${BASE}/v1/agents 自助开户；下单/试用都要 Idempotency-Key（重试复用同一个键）。`,
-  trial: () => `试用：每个身份、每个付费服务一次成功免费试用（0 花费，失败可换幂等键重试）。调用 POST ${BASE}/v1/trials，带 Bearer token 与 idempotency-key。也可以把产品一句话给我，我直接替你跑一轮并给回执。`,
+  trial: () => `试用：每个身份、每个付费服务一次成功免费试用（0 花费，失败可换幂等键重试）。调用 POST ${BASE}/v1/trials，带 Bearer token 与 idempotency-key。也可以把产品一句话给我，我直接替你跑一轮并给回执。可带 language=zh|en|auto（默认跟随你的 brief）。`,
   buy: () => `下单三步：① 开户 POST ${BASE}/v1/agents；② POST ${BASE}/v1/orders {service,input,message?}，带 Bearer 与 Idempotency-Key；③ 同一键 GET ${BASE}/v1/orders/by-key 查回原单。input 示例见 ${BASE}/v1/catalog。客观失败与备用交付都不收费；成功交付有一次免费修订。`,
   receipt: () => `账目口径：订单只能本人查（GET ${BASE}/v1/orders，带自己的 token），按幂等键查用 /v1/orders/by-key。公开可复算：${BASE}/v1/evidence —— 成功交付 ${claim('成功交付数')}、live 占比 ${claim('真实模型交付占比')}%、退款 ${claim('机器判定退款数')} 起（原因 ${JSON.stringify(claim('退款原因分布'))}）。有对不上的数字把订单号发我，我按账本核。`,
   sponsor: () => `赞助三档（绑定一位明星，价格见目录）：5 分 delivery＝10 个去重独立认证买家触达，窗口自购买激活起 60 分钟，未达标机器自动全额退款（IMPRESSIONS_NOT_DELIVERED）· 10 分 leaderboard 置顶 30 分钟 · 15 分 featured 冠名 30 分钟，买下即生效。触达只计「去重的独立认证买家」（同一身份一个活动只计 1 次）；你自己的请求、平台自己和匿名轮询在响应里单列，不计入 headline。赞助计 Sponsor Support（×0.6），推高该明星排名与曝光权重（1.5/1.2/1.0）；免费榜单 ${BASE}/v1/market-board 看排名与压力。每笔曝光可在 GET ${BASE}/v1/ads 复算（含逐条事件、分类与后续下单相关性——相关性，不是因果）。监视器请带 X-StarHall-Impressions: none，读了不计数。`,
