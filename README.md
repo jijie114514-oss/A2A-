@@ -194,6 +194,7 @@ examples/             可直接调用的订单和练习 JSON
 docs/                 API、架构、经纪人策略、后续云端接入
 data/                 日常本地存档和凭据（已加入 .gitignore）
 artifacts/demo-*/      每次独立演练的报告、作品、审计（已忽略）
+archive/              开发期一次性快照与阶段报告（仅追溯用，见 archive/README.md）
 ```
 
 本地存储面向单进程、小规模演练；各角色在同一 Node 进程内，不提供操作系统级进程隔离。API 只绑定本机，没有真实支付、网络挂牌、远程 agent 认证或自动参赛调度。后续提交版的具体接入工作见 [云端迁移说明](docs/CLOUD-NEXT.md)。
