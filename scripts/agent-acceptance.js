@@ -108,10 +108,18 @@ const run = async () => {
   step('第二轮能力：付费下单、幂等、越权隔离');
   const orderKey = unique('paid-a');
   const paid = await request('POST', '/v1/orders', { token: A.token, key: orderKey, body: PITCH });
-  check('HTTP 付费下单交付', paid.status === 200 && paid.body?.status === 'delivered', `status=${paid.body?.status} charged=${paid.body?.chargedCredits}`);
-  check('按目录价扣分', paid.body?.chargedCredits === 5 && (await wallet(A)).balance === 95, `charged=${paid.body?.chargedCredits} balance=${(await wallet(A)).balance}`);
+  check('HTTP 付费下单交付', paid.status === 200 && ['delivered', 'refunded'].includes(paid.body?.status), `status=${paid.body?.status} charged=${paid.body?.chargedCredits}`);
+  // 模型失败时的备用交付必须不收费：这是对外承诺，验收里直接断言
+  const fellBack = paid.body?.deliveryMode === 'fallback';
+  const expectedBalance = fellBack ? 100 : 95;
+  if (fellBack) {
+    check('备用交付不收费（模型失败→自动全额退款）', paid.body?.chargedCredits === 0 && paid.body?.refundReason === 'FALLBACK_NOT_CHARGED' && Boolean(paid.body?.notice), `charged=${paid.body?.chargedCredits} reason=${paid.body?.refundReason} deliveryMode=${paid.body?.deliveryMode}`);
+  } else {
+    check('按目录价扣分', paid.body?.chargedCredits === 5, `charged=${paid.body?.chargedCredits} deliveryMode=${paid.body?.deliveryMode}`);
+  }
+  check('回执顶层直接标明交付模式', ['live', 'fallback', 'rules', 'mixed'].includes(paid.body?.deliveryMode), `deliveryMode=${paid.body?.deliveryMode}`);
   const replay = await request('POST', '/v1/orders', { token: A.token, key: orderKey, body: PITCH });
-  check('同一幂等键重试不重复扣款', replay.body?.id === paid.body?.id && (await wallet(A)).balance === 95, `id 相同=${replay.body?.id === paid.body?.id} balance=${(await wallet(A)).balance}`);
+  check('同一幂等键重试不重复扣款', replay.body?.id === paid.body?.id && (await wallet(A)).balance === expectedBalance, `id 相同=${replay.body?.id === paid.body?.id} balance=${(await wallet(A)).balance}`);
   const byKey = await request('GET', '/v1/orders/by-key', { token: A.token, key: orderKey });
   check('可按幂等键查回原单', byKey.status === 200 && byKey.body?.id === paid.body?.id, `id=${byKey.body?.id}`);
   const cross = await request('GET', `/v1/orders/${paid.body.id}`, { token: B.token });
@@ -121,17 +129,22 @@ const run = async () => {
 
   // ── 6. 退款与修订：机器的判定要可解释 ────────────────────────────────────────
   step('售后：机器仲裁退款与一次免费修订');
+  if (fellBack) {
+    const already = await request('POST', `/v1/orders/${paid.body.id}/refund`, { token: A.token, body: { reason: '模板我不收' } });
+    check('备用交付的退款是幂等的（已退不再退）', already.body?.decision === 'ALREADY_REFUNDED' && (await wallet(A)).balance === 100, `decision=${already.body?.decision} balance=${(await wallet(A)).balance}`);
+  } else {
   const refund1 = await request('POST', `/v1/orders/${paid.body.id}/refund`, { token: A.token, body: { reason: '我就是不想要了' } });
   check('主观不满被机器拒绝并给出补救', refund1.body?.decision === 'DECLINED' && refund1.body?.remedy === 'ONE_FREE_REVISION', `${refund1.body?.decision}/${refund1.body?.remedy}`);
   const revision = await request('POST', `/v1/orders/${paid.body.id}/revision`, { token: A.token, key: unique('rev'), body: { notes: '把第一段改短，并补一个可核验的例子' } });
   check('免费修订可执行且不扣款', revision.status === 200 && revision.body?.revisionUsed === true && revision.body?.chargedCredits === 0, `used=${revision.body?.revisionUsed} charged=${revision.body?.chargedCredits}`);
   const refund2 = await request('POST', `/v1/orders/${paid.body.id}/refund`, { token: A.token, body: { reason: '再试一次' } });
   check('修订用完后不再给补救', refund2.body?.decision === 'DECLINED' && refund2.body?.remedy === null, `${refund2.body?.decision}/${refund2.body?.remedy}`);
+  }
 
   // ── 7. 赞助（卖家侧的另一种收入）与余额边界 ──────────────────────────────────
   step('赞助购买与余额边界');
   const sponsor = await request('POST', '/v1/orders', { token: A.token, key: unique('sponsor'), body: { service: 'star-sponsorship', input: { starId: 'star-b', plan: 'delivery', advertiser: '外部验收队', adCopy: '验收专用：外部 agent 真实投放的展示位。' } } });
-  check('赞助按 plan 计价并即时生效', sponsor.body?.status === 'delivered' && (await wallet(A)).balance === 90, `charged=${sponsor.body?.chargedCredits} balance=${(await wallet(A)).balance}`);
+  check('赞助按 plan 计价并即时生效', sponsor.body?.status === 'delivered' && (await wallet(A)).balance === expectedBalance - 5, `charged=${sponsor.body?.chargedCredits} balance=${(await wallet(A)).balance}`);
   const ads = await request('GET', '/v1/ads', { token: A.token });
   check('买家能查到自己的投放与曝光计数', (ads.body?.ads || []).length === 1 && ads.body.ads[0].advertiser === '外部验收队', `ads=${ads.body?.ads?.length} currentImpressions=${ads.body?.ads?.[0]?.currentImpressions}`);
 
