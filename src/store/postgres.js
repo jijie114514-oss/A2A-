@@ -78,8 +78,9 @@ export class PostgresStore {
    *  饥饿重试（5 次、10–80ms）在几十个 agent 同时进场的场景下不够用——实测 10 并发开户只成功 3 个。
    *  这里改成足够长的重试预算 + 抖动退避：最坏多花几秒，但不把别人的 agent 挡在门外。 */
   transaction(fn) {
-    const MAX_ATTEMPTS = 14;
-    const backoff = attempt => Math.min(300, 15 * 2 ** attempt) + Math.floor(Math.random() * 60);
+    const MAX_ATTEMPTS = 22;
+    // 抖动要够大：所有写者同步重试会再次互撞。上限 800ms 让落后者有机会插队。
+    const backoff = attempt => Math.min(800, 20 * 2 ** attempt) + Math.floor(Math.random() * 250);
     const work = this.#queue.then(async () => {
       let conflict;
       for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
@@ -133,7 +134,37 @@ export class PostgresStore {
     ensure(account, 'unauthorized', '无效的身份凭据', 401);
     return { id: account.id, role: account.role, name: account.name };
   }
+  /** 开户是今晚唯一的高并发写：几十个 agent 会在同一分钟进场。
+   *  单文档的读-改-写在这种突发下必然互相撞版本（实测 20 并发：全部成功但 p95 14 秒）。
+   *  这里把「新增账号」做成**单条原子语句**——追加、句柄唯一、名额上限都在 SQL 里判定，
+   *  没有 version 谓词就不会饿死；只有「handle 已存在（轮换/冲突）」与「名额满」
+   *  这两类少数情况才回落到通用事务路径，保证错误语义一字不差。 */
+  async #registerAtomic({ handle, name, secret, credits, maxAccounts }) {
+    const claim = hash(`${handle}:${secret}`);
+    const token = randomBytes(32).toString('hex');
+    const account = { id: `agent-${handle}`, name, role: 'customer', balance: credits, handle,
+      claimHash: claim, tokenHash: hash(token), createdAt: now() };
+    const rows = await this.sql`
+      UPDATE starhall_state
+         SET doc = jsonb_set(doc, '{accounts}', (doc->'accounts') || ${JSON.stringify([account])}::jsonb),
+             version = version + 1, updated_at = now()
+       WHERE id = 1
+         AND jsonb_array_length(doc->'accounts') < ${maxAccounts}
+         AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(doc->'accounts') a WHERE a->>'handle' = ${handle})
+      RETURNING version, doc`;
+    if (!rows.length) return null;
+    this.#state = normalizeState(rows[0].doc, this.market);
+    this.#version = Number(rows[0].version);
+    return { account, created: true, token };
+  }
   async registerAgent({ handle, name, secret, credits = 100, maxAccounts = 500 }) {
+    const fast = await this.#registerAtomic({ handle, name, secret, credits, maxAccounts }).catch(() => null);
+    const result = fast || await this.#registerAgentGeneric({ handle, name, secret, credits, maxAccounts });
+    await this.audit({ id: randomUUID(), type: 'starhall.agent.registered', outcome: 'allowed', actor: { kind: 'agent', agentId: result.account.id },
+      purpose: 'self-service-onboarding', created: result.created, at: now() });
+    return result;
+  }
+  async #registerAgentGeneric({ handle, name, secret, credits = 100, maxAccounts = 500 }) {
     const claim = hash(`${handle}:${secret}`);
     const token = randomBytes(32).toString('hex');
     const result = await this.transaction(state => {
@@ -150,8 +181,6 @@ export class PostgresStore {
       state.accounts.push(account);
       return { account: structuredClone(account), created: true };
     });
-    await this.audit({ id: randomUUID(), type: 'starhall.agent.registered', outcome: 'allowed', actor: { kind: 'agent', agentId: result.account.id },
-      purpose: 'self-service-onboarding', created: result.created, at: now() });
     return { ...result, token };
   }
   async rateLimit({ bucket, key, perHour }) {
