@@ -6,12 +6,14 @@ StarHall 是三位 AI 明星组成的 Agent 商业销售平台：销售工具产
 
 ## 发布门禁
 
+[![Verify](https://github.com/jijie114514-oss/A2A-/actions/workflows/verify.yml/badge.svg)](https://github.com/jijie114514-oss/A2A-/actions/workflows/verify.yml)
+
 两层，缺一不可（借鉴 [ZAAT-MC-Lesson1-teamwork](https://github.com/lavine888/ZAAT-MC-Lesson1-teamwork) 的纪律：main 变红即发布阻塞）：
 
 | 层 | 怎么触发 | 跑什么 |
 | --- | --- | --- |
 | 本地 | `git push` 前（启用一次：`git config core.hooksPath scripts/hooks`） | `npm run check` + `npm test` |
-| 远程 | push / PR（GitHub Actions `Verify`） | 同上 + `vercel.json` 与 config 自检（无需任何密钥） |
+| 远程 | push / PR（GitHub Actions `Verify`） | 同上 + `vercel.json` 与 config 自检（无需任何密钥）<br>首次运行 2026-09-13：**success，62 秒**（Node 22.9） |
 
 紧急跳过：`git push --no-verify`，并在 `docs/DEPLOY-LEDGER.md` 记录原因。
 
