@@ -83,7 +83,7 @@ export class Brain {
         if (remaining <= 0) throw new AppError('model_timeout', '模型生成及修复超过总时限', 504);
         attempts++;
         try {
-          const system = systemPrompt(star, service) + (attempt ? `\n上一次输出不符合本服务格式：${failure.message}。请根据相同输入重新生成完整作品，不要解释修复过程，不得省略必填数组。` : '');
+          const system = systemPrompt(star, service, input) + (attempt ? `\n上一次输出不符合本服务格式：${failure.message}。请根据相同输入重新生成完整作品，不要解释修复过程，不得省略必填数组。` : '');
           // The host renders purchase-history greetings. Past subjects must not contaminate new work.
           const user = JSON.stringify({ service, input, taskMaterial: inputBrief(input, service), returningFan: memory.length > 0,
             deliveryContract: deliveryContract(input, service), ...(attempt ? { correctionRequired: failure.message } : {}) });

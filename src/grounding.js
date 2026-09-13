@@ -82,8 +82,14 @@ export function contentText(work, service) {
 export function compareInput(work, service, input) {
   const body = contentText(work, service);
   const introduction = `${work.title || ''}\n${work.text || ''}`;
+  // 输出语言与输入锚点语言不一致时（例如英文 brief、language=en 交付），逐词命中不再强制：
+  // 跨语言表达不可能逐字保留原文，用汉字锚点去卡英文交付会制造假阴性（TrustSieve #45 / Ground #406）。
+  const latin = (body.match(/[A-Za-z]/g) || []).length, cjk = (body.match(/[\u4e00-\u9fff]/g) || []).length;
+  const englishBody = latin >= 20 && latin > cjk * 2;
+  const scriptOf = q => (/[\u4e00-\u9fff]/.test(q) ? 'zh' : /[A-Za-z]/.test(q) ? 'en' : 'any');
+  const keep = quote => !englishBody || scriptOf(quote) !== 'zh';
   return { method: 'input-keyword-evidence', limitation: '核对输入原文与正文关键词，不代表完整语义理解或事实验证。',
-    fields: inputBrief(input, service).map(({ field, provided, anchors, minimumMatches }) => ({ field, provided, minimumMatches,
+    fields: inputBrief(input, service).map(({ field, provided, anchors, minimumMatches }) => ({ field, provided, minimumMatches: anchors.some(a => keep(a.quote)) ? minimumMatches : 0,
       points: anchors.map(({ quote, alternatives, required }) => {
         let evidenceText = body;
         let location = 'body';
@@ -95,7 +101,7 @@ export function compareInput(work, service, input) {
           if (matched) { evidenceText = introduction; location = 'title-or-intro'; }
         }
         const index = matched ? evidenceText.toLocaleLowerCase().indexOf(matched.toLocaleLowerCase()) : -1;
-        return { inputQuote: quote, required, matched: Boolean(matched), location, evidence: index < 0 ? null : evidenceText.slice(Math.max(0, index - 28), index + matched.length + 65) };
+        return { inputQuote: quote, required: required && keep(quote), matched: Boolean(matched), location, evidence: index < 0 ? null : evidenceText.slice(Math.max(0, index - 28), index + matched.length + 65) };
       }) })) };
 }
 export function checkGrounding(work, service, input) {

@@ -11,7 +11,9 @@ export const SPONSOR_PLANS = {
   leaderboard: { price: 10, tier: 'ad-pin', placement: 'leaderboard', impressions: null, minutes: 30 },
   featured: { price: 15, tier: 'ad-sponsor', placement: 'featured-naming', impressions: null, minutes: 30 },
 };
-const productProperties = { productName: text(160), productDescription: text(4000), price: amount, targetBuyer: text(500), context: text(4000) };
+// 交付语言：auto（默认）跟随输入语言；显式 zh/en 可覆盖。英文 input 不该在未被要求时变成中文交付。
+const languageProperty = { type: 'string', enum: ['zh', 'en', 'auto'], description: 'Output language. auto follows the input language (default).' };
+const productProperties = { productName: text(160), productDescription: text(4000), price: amount, targetBuyer: text(500), context: text(4000), language: languageProperty };
 const productSchema = { type: 'object', properties: productProperties, additionalProperties: false, anyOf: [{ required: ['productDescription'] }, { required: ['context'] }] };
 const make = (id, star, name, price, brief, inputSchema, example) => ({ id, star, name, price, brief, inputSchema, example, commercial: true, fields: [], currency: 'local-credit', maxDeliverySeconds: DELIVERY_BUDGET_SECONDS });
 export const COMMERCIAL_SERVICES = [
@@ -20,7 +22,7 @@ export const COMMERCIAL_SERVICES = [
   make('sales-stress-test', 'star-b', 'Sales Stress Test', 6, 'Simulate why buyers may reject your own offer. SIMULATED, not observed buyer feedback.', productSchema,
     { productDescription: '我方代码审查服务，输出风险清单', price: 20 }),
   make('deal-coach', 'star-c', 'Deal Coach', 10, 'Get the next move for pricing and negotiation.', {
-    type: 'object', additionalProperties: false, properties: { currentOffer: amount, counterpartyMessage: text(), budget: amount, minimumAcceptablePrice: amount, goal: text(), context: text(4000) },
+    type: 'object', additionalProperties: false, properties: { currentOffer: amount, counterpartyMessage: text(), budget: amount, minimumAcceptablePrice: amount, goal: text(), context: text(4000), language: languageProperty },
     anyOf: ['currentOffer', 'counterpartyMessage', 'goal', 'context'].map(field => ({ required: [field] })),
   }, { currentOffer: 20, budget: 15, counterpartyMessage: '能否缩小范围？', goal: '预算内采购代码审查' }),
   { ...make('star-sponsorship', 'ledger', 'Star Sponsorship', null, 'Sponsor Star A, B or C. Impression plans count unique authenticated buyers; delivery refunds automatically if the target is not reached in the window.', {

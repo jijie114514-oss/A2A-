@@ -24,8 +24,8 @@ export function outputExample(service) {
   if (service === 'practice') base.coaching = '针对本次买家发言的一条改进建议';
   return base;
 }
-export function systemPrompt(star, service) {
-  if (isSales(service)) return salesPrompt(service);
+export function systemPrompt(star, service, input = {}) {
+  if (isSales(service)) return salesPrompt(service, input);
   const focus = {
     review: '只评审 input.description 中的产品。每个异议指出材料依据或明确待验证；不得把推断写成实测故障。',
     roast: '唯一吐槽对象是 input.description 中的产品。准确保留对象和业务用途，例如软件单元测试不是学生作业。幽默围绕其具体功能与缺口展开。',
