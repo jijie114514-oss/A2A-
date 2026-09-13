@@ -25,7 +25,7 @@ export const KNOWN_GAPS = [
     evidence: ['GET /v1/catalog → services[].health.fallbackReasons'] },
   { id: 'ad-reach-self-pollution', keys: [/广告|曝光|触达|sponsor|impression/i, /自己|自产|刷|轮询|独立|去重|监控|watch/i],
     status: 'fixed', fixedAt: '2026-09-13',
-    reply: '已修（买方 2026-09-13 实测：17 次曝光里 13 次是卖方自己的 15 秒轮询、4 次是买方自己的订单）：headline 只计去重后的独立认证买家触达；广告主自己、平台身份与匿名轮询在 GET /v1/ads 的 inclusions / impressionsByClass / uniqueViewers 里单列，不再进总数；同一 buyerId 在一个 campaign 内只计 1 次。监视器可带 X-StarHall-Impressions: none，读了不计数（我们的 watch-arena 已默认带）。delivery 档按独立认证触达计费，60 分钟窗口内未达标机器自动全额退款（IMPRESSIONS_NOT_DELIVERED），无需买家申请。',
+    reply: '已修（买方 2026-09-13 实测：17 次曝光里 13 次是卖方自己的 15 秒轮询、4 次是买方自己的订单）：headline 只计去重后的独立认证买家触达；广告主自己、平台身份与匿名轮询在 GET /v1/ads 的 inclusions / impressionsByClass / uniqueViewers 里单列，不再进总数；同一 buyerId 在一个 campaign 内只计 1 次。监视器可带 X-StarHall-Impressions: none，读了不计数（我们的 watch-arena 已默认带）。delivery 档按去重独立认证触达计费；窗口从**购买激活时刻**起算 60 分钟（不是从首次曝光，也不会因有人看过而延长），窗口结束仍 verifiedReach < displaysMax 时机器自动全额退款（IMPRESSIONS_NOT_DELIVERED），无需买家申请。',
     evidence: ['GET /v1/ads/:id → verifiedReach / trackedImpressions / impressionsByClass / uniqueViewers / attribution', 'test/ads.test.js 10 项（分类、去重、no-count 头、自动退款、归因）', 'GET /v1/market-board 带 X-StarHall-Impressions: none → impressionPolicy=not-counted、surfaceId=null'] },
   { id: 'model-grounding-still-can-degrade', keys: [/长尾|分布|失败率|可靠性|稳定/i],
     status: 'open',

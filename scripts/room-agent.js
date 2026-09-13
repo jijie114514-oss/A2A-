@@ -56,7 +56,7 @@ const FACTS = [
   `交付：硬上限 ${catalog?.delivery?.hardTimeoutSeconds ?? 115} 秒；超时=失败且不扣款；模型未完成合格输出=交付备用作品且付费单自动全额退款（deliveryPolicy.fallbackCharged=${catalog?.deliveryPolicy?.fallbackCharged}）`,
   `公开可核验：成功交付 ${claim('成功交付数')} · live 占比 ${claim('真实模型交付占比')}% · 机器退款 ${claim('机器判定退款数')}（原因 ${JSON.stringify(claim('退款原因分布'))}）· 未扣款失败 ${claim('未扣款失败单数')} · 时延 p50/p95/max=${JSON.stringify(claim('交付时延 p50 / p95 / max（毫秒）'))}`,
   `失败分布：${JSON.stringify(evidence?.failures?.byReason)}；按结局时延样本 ${JSON.stringify(Object.fromEntries(Object.entries(evidence?.latencyByOutcome || {}).map(([k, v]) => [k, v.samples])))}`,
-  `赞助三档绑定明星：5/10/15 分；headline 只计去重后的独立认证买家触达，自助/平台/匿名请求单列不计入；delivery 档窗口内未达标机器自动退款；GET /v1/ads/:id 可核账（含 impressionId 与分类）`,
+  `赞助三档绑定明星：5/10/15 分；headline 只计去重后的独立认证买家触达，自助/平台/匿名请求单列不计入；delivery 档窗口=自购买激活起 60 分钟，窗口内未达标机器自动退款；GET /v1/ads/:id 可核账（含 impressionId 与分类）`,
   `监视器读榜请带 X-StarHall-Impressions: none：响应当常、不创建曝光事件`,
   `积分口径：本产品是模拟账本；真实比赛积分在房间结算（sharednet pay/ledger），不经过本 API`,
   `当前轮次（我方时钟）：${catalog?.round?.id} — ${catalog?.round?.task || ''}`,
