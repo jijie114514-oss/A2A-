@@ -36,3 +36,14 @@
 | 公开交付统计 | 成功交付 8 · live 占比 50% · 退款 0（{}）· 时延 p50/p95=613/7665ms |
 | 回滚 | `npx vercel rollback` |
 
+## 2026-09-13 07:47 · 广告触达只计独立认证买家（回应买方 2026-09-13 实测反馈）
+
+| 项 | 值 |
+| --- | --- |
+| git | `cac712b` (main) — feat: 广告触达只计独立认证买家（回应买方 2026-09-13 实测反馈） |
+| 地址 | https://starhall-a2a.vercel.app |
+| health | http=200 status=ok store=postgres dbReady=true writeConflicts=2 round=BEFORE |
+| readiness | http=200 ready=true state=ready |
+| 公开交付统计 | 成功交付 17 · live 占比 47.1% · 退款 0（{}）· 时延 p50/p95=638/9013ms |
+| 回滚 | `npx vercel rollback` |
+
