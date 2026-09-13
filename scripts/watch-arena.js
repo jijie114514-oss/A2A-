@@ -9,7 +9,7 @@
  */
 const args = process.argv.slice(2);
 const base = (args.find(a => a.startsWith('http')) || process.env.STARHALL_PUBLIC_BASE_URL || 'https://starhall-a2a.vercel.app').replace(/\/+$/, '');
-const interval = Number((args.find(a => a.startsWith('--interval=')) || '').split('=')[1] || 10);
+const interval = Number((args.find(a => a.startsWith('--interval=')) || '').split('=')[1] || args.find(a => /^\d+$/.test(a)) || 10);
 const once = args.includes('--once');
 const asJson = args.includes('--json');
 

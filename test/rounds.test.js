@@ -6,6 +6,7 @@ import path from 'node:path';
 import { config } from '../src/config.js';
 import { startServer } from '../src/server.js';
 import { StarHall } from '../src/app.js';
+import { AppError } from '../src/errors.js';
 import { roundOf, roundContext, TRIAL_POLICY, CRITIQUE_START, MARKET_START, ARENA_END } from '../src/rounds.js';
 import { DELIVERY_BUDGET_SECONDS } from '../src/limits.js';
 import { SERVICES, AD_SERVICES } from '../src/catalog.js';
@@ -74,6 +75,11 @@ test('公开证据端点与 MCP 工具：数字可复算，且如实说明不主
 
   const evidence = await (await fetch(host.url + '/v1/evidence')).json();
   const claim = name => evidence.claims.find(c => c.claim.startsWith(name)).value;
+  // 第一轮被点评到并已补齐的分布：失败按原因/服务，时延按结局分组
+  assert.equal(typeof evidence.failures.total, 'number');
+  assert.equal(typeof evidence.failures.byReason, 'object');
+  assert.ok(evidence.latencyByOutcome.delivered.samples >= 1);
+  assert.equal(claim('失败单按原因与服务的分布（见 failures 字段）').byService['poem'], undefined);
   assert.equal(claim('成功交付数'), 2);
   assert.equal(claim('免费试用次数'), 1);
   assert.equal(claim('付费成交笔数与模拟积分').orders, 1);
@@ -92,4 +98,25 @@ test('公开证据端点与 MCP 工具：数字可复算，且如实说明不主
   const listed = await (await fetch(host.url + '/mcp', { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream' },
     body: JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} }) })).json();
   assert.ok(listed.result.tools.some(tool => tool.name === 'starhall_evidence'));
+});
+
+
+test('失败单的分布可被外部复算：按原因与服务分组，且不计入已交付时延', async t => {
+  const dataDir = await mkdtemp(path.join(tmpdir(), 'starhall-evidence-fail-'));
+  const failing = { options: { fallback: false }, generate: async () => { throw new AppError('model_http_error', '模型服务返回 HTTP 502', 502); } };
+  const env = { STARHALL_DATA_DIR: dataDir, STARHALL_STORE: 'file', STARHALL_OPEN_REGISTRATION: 'true' };
+  const app = await StarHall.open(config(env), failing);
+  const host = await startServer(config({ ...env, STARHALL_PORT: '0' }), app); t.after(() => host.close());
+  const registered = await (await fetch(host.url + '/v1/agents', { method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ handle: `evfail-${Date.now().toString(36)}`, name: '失败分布自检', secret: 'x'.repeat(24) }) })).json();
+  const failed = await (await fetch(host.url + '/v1/orders', { method: 'POST', headers: { authorization: `Bearer ${registered.token}`, 'content-type': 'application/json', 'idempotency-key': 'will-fail' },
+    body: JSON.stringify({ service: 'poem', input: { theme: '失败分布', recipient: '队伍' } }) })).json();
+  assert.equal(failed.status, 'failed'); assert.equal(failed.chargedCredits, 0);
+  const evidence = await (await fetch(host.url + '/v1/evidence')).json();
+  assert.equal(evidence.failures.total, 1);
+  assert.equal(evidence.failures.byReason.model_http_error, 1);
+  assert.equal(evidence.failures.byService.poem, 1);
+  assert.equal(evidence.latencyByOutcome.failed.samples, 1);
+  assert.equal(evidence.latencyByOutcome.delivered.samples, 0);
+  assert.equal(evidence.outcomes.failed, 1);
 });

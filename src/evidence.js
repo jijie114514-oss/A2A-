@@ -27,6 +27,18 @@ export function evidenceOf(state, options = {}) {
   const trials = (state.wall || []).filter(w => w.kind === 'trial');
   const paidWall = (state.wall || []).filter(w => w.amount > 0 && (!w.kind || w.kind === 'paid'));
 
+  // 按结局分组的时延与失败分布：只统计失败总数不够，买家需要知道「失败落在哪、为什么」。
+  const latencyOf = subset => {
+    const xs = subset.map(o => o.elapsedMs).filter(n => Number.isFinite(n)).sort((a, b) => a - b);
+    return { samples: xs.length, p50: percentile(xs, 0.5), p95: percentile(xs, 0.95), max: xs.at(-1) ?? null };
+  };
+  const failures = {
+    total: failed.length,
+    byReason: count(failed.map(o => o.error?.code || 'unspecified')),
+    byService: count(failed.map(o => o.service)),
+    note: 'failed = 未交付且未扣款（超时/中断/模型失败）。机器判定退款单已交付、已扣款再退回，单独统计，不计入 failed。',
+  };
+
   const claims = [
     { claim: '已结算订单数（含试用、失败与退款）', value: settled.length, source: 'state.orders 中 status !== pending' },
     { claim: '成功交付数', value: delivered.length, source: 'state.orders 中 status === delivered' },
@@ -35,6 +47,7 @@ export function evidenceOf(state, options = {}) {
     { claim: '机器判定退款数（客观失败自动退，不依赖人工）', value: refunded.length, source: 'order.refund.refundApplied 或 status === refunded' },
     { claim: '退款原因分布', value: refundReasons, source: 'order.refund.refundReason' },
     { claim: '未扣款失败单数（超时/中断，预留积分已释放）', value: failed.length, source: 'status === failed' },
+    { claim: '失败单按原因与服务的分布（见 failures 字段）', value: { byReason: failures.byReason, byService: failures.byService }, source: 'order.error.code 与 order.service' },
     { claim: '交付时延 p50 / p95 / max（毫秒）', value: { p50: percentile(latencies, 0.5), p95: percentile(latencies, 0.95), max: latencies.at(-1) ?? null, samples: latencies.length }, source: 'order.elapsedMs（下单到结算的墙钟时间）' },
     { claim: '免费试用次数', value: trials.length, source: 'wall 中 kind === trial' },
     { claim: '付费成交笔数与模拟积分', value: { orders: paidWall.length, credits: paidWall.reduce((sum, w) => sum + w.amount, 0) }, source: 'wall 中 amount > 0' },
@@ -48,6 +61,9 @@ export function evidenceOf(state, options = {}) {
     asOf: new Date().toISOString(),
     round: roundContext(),
     claims,
+    failures,
+    latencyByOutcome: { delivered: latencyOf(delivered), refunded: latencyOf(refunded), failed: latencyOf(failed) },
+    outcomes: { delivered: delivered.length, refunded: refunded.length, failed: failed.length, pending: orders.filter(o => o.status === 'pending').length },
     services: Object.keys(STARS).map(star => ({ star, name: STARS[star].name,
       deliveries: delivered.filter(o => o.delivery?.pieces?.some(p => p.star === star)).length,
       live: pieces.filter(p => p.star === star && p.generation?.mode === 'live').length,
