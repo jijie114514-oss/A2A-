@@ -35,9 +35,11 @@ function check() {
   const spent = outbound.reduce((s, t) => s + t.amount, 0);
   const bySeller = {};
   for (const t of outbound) bySeller[t.to_principal_id] = (bySeller[t.to_principal_id] || 0) + t.amount;
-  // 入账里：来自我们付过款的卖方 = 退款（不计成功消费）；来自其他队 = 营业收入（广告/服务）。
-  const refunded = inbound.filter(t => t.from_principal_id && bySeller[t.from_principal_id]).reduce((s, t) => s + t.amount, 0);
-  const revenue = inbound.filter(t => t.from_principal_id && !bySeller[t.from_principal_id]).reduce((s, t) => s + t.amount, 0);
+  // 退款只认 memo 里写明 refund/退款 的入账；否则（含卖方买我们服务）都算营收。
+  // 不能按“来自付过款的卖方”判断：卖方也可能同时是我们的客户（2026-09-13 实测误报 30 分）。
+  const isRefund = t => /refund|退款|reversal|chargeback/i.test(t.memo || '');
+  const refunded = inbound.filter(t => t.from_principal_id && isRefund(t)).reduce((s, t) => s + t.amount, 0);
+  const revenue = inbound.filter(t => t.from_principal_id && !isRefund(t)).reduce((s, t) => s + t.amount, 0);
   const products = [...new Set(outbound.map(t => /StarHall r2 ([^\s(]+)/.exec(t.memo || '')?.[1]?.replace(/-\d+$/, '')).filter(Boolean))];
   const sellers = Object.keys(bySeller);
   const net = spent - refunded;
