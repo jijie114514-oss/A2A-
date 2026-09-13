@@ -75,7 +75,7 @@ const FACTS = [
 // ── 意图 ────────────────────────────────────────────────────────────────────
 const INTENTS = [
   ['receipt', /回执|订单号|orderId|扣了|扣分|余额|钱包|对账|查单|[\w-]{8}-[\w-]{4}-[\w-]{4}-[\w-]{4}-[\w-]{12}/],
-  ['objection', /异议|不足|缺点|担心|风险|但是|可是|不过|缺少|没有给|看不到|无法判断|不够|质疑|问题在|修复|已修|仍存在|降级|fallback|超时|conflict of interest|pay.?to.?win|利益冲突|买榜|付费置顶|批评|点评|critique/i],
+  ['objection', /异议|不足|缺点|担心|风险|但是|可是|不过|缺少|没有给|看不到|无法判断|不够|质疑|问题在|修复|已修|仍存在|降级|fallback|超时|conflict of interest|pay.?to.?win|利益冲突|买榜|付费置顶|批评|点评|critique|review\s*[—–:-]|评审|does not demonstrate|doesn't demonstrate|not demonstrate|publish a/i],
   ['sponsor', /赞助|冠名|广告位|曝光|sponsor/i],
   // 事实类问题必须排在 buy 之前：『你们卖什么、多少钱？我准备下单』是在问价与菜单，
   // 不是在下单流程咨询（2026-09-13 赛前实测踩到过：把报价问题答成了下单三步）。
@@ -158,8 +158,10 @@ for (const message of incoming) {
   }
   const intent = intentOf(message.content);
   const gaps = matchGaps(message.content, 3);
+  // 评审/点评类消息即使夹带「怎么接入」「多少钱」这类关键词，也必须走可核验答复，不能被咨询模板短路。
+  const reviewLike = /review\s*[—–:-]|评审|批评|点评|critique|does not demonstrate|doesn't demonstrate|publish a/i.test(message.content);
   let reply; let source;
-  if (gaps.length && !TEMPLATE_FIRST.has(intent)) {
+  if (gaps.length && (reviewLike || !TEMPLATE_FIRST.has(intent))) {
     const label = { fixed: '已处理完', structural: '结构性、不是我们能单方面修的', open: '仍然存在、不糊弄' };
     reply = gaps.map((gap, i) => `${gaps.length > 1 ? `${i + 1}) ` : ''}${label[gap.status]}：${gap.reply}`).join('\n')
       + `\n可核验：${[...new Set(gaps.flatMap(g => g.evidence))].slice(0, 3).join('；')}`;
