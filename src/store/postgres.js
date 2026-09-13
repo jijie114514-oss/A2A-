@@ -36,6 +36,7 @@ export class PostgresStore {
   #auditQueue = Promise.resolve();
   #state = null;
   #version = 0;
+  #loadedAtAt = 0;
   constructor(options = {}) {
     ensure(options.databaseUrl, 'invalid_config', 'PostgresStore 需要 DATABASE_URL');
     this.url = options.databaseUrl;
@@ -43,6 +44,7 @@ export class PostgresStore {
     this.mode = options.mode || 'cloud';
     this.store = 'postgres';
     this.dir = null;
+    this.staleSince = null;
     this.dataSet = options.dataSet || null;
   }
   async open() {
@@ -62,8 +64,30 @@ export class PostgresStore {
     ensure(this.#state, 'store_not_ready', '存储尚未初始化', 503);
     return structuredClone(this.#state);
   }
-  /** 每请求刷新：多实例下保证读到最新版本；同时更新本实例的同步快照。 */
-  async refresh() { await this.#reload(); return this.read(); }
+  /**
+   * 每请求刷新：多实例下保证读到最新版本，同时更新本实例的同步快照。
+   *
+   * 为什么要 TTL：每次刷新都是一次「整份文档」的 SELECT，而 Neon 免费版按**公网传输量**
+   * 计费（5 GB/月，超了直接挂起，2026-09-13 我们就是这样被打挂的）。行情榜/证据页/健康检查
+   * 这类轮询流量不需要毫秒级新鲜度，2 秒内的重复读走内存快照即可；写路径仍走
+   * transaction()（每次重新读版本），认证路径在缓存未命中时会强制回源。
+   *
+   * 降级而非死亡：回源失败时保留最后一份好快照并把 staleSince 记下来，读端点继续服务，
+   * 由 /readiness 与 /health 如实报告「陈旧」。写完仍然失败的是写请求，那才该报错。
+   */
+  async refresh({ force = false } = {}) {
+    const ttl = Number(process.env.STARHALL_REFRESH_TTL_MS ?? 2000);
+    if (!force && this.#state && Date.now() - this.#loadedAtAt < ttl) return this.read();
+    try { await this.#reload(); this.#loadedAtAt = Date.now(); this.staleSince = null; }
+    catch (error) {
+      if (!this.#state) throw error;                       // 从未成功读过 → 真的不可用
+      this.staleSince ||= Date.now();
+      this.lastError = String(error.message).slice(0, 200);
+    }
+    return this.read();
+  }
+  get stale() { return Boolean(this.staleSince); }
+  get lastLoadedAt() { return this.#loadedAtAt ? new Date(this.#loadedAtAt).toISOString() : null; }
   async #select() {
     const rows = await this.sql`SELECT doc, version FROM starhall_state WHERE id = 1`;
     if (!rows.length) throw new AppError('store_not_ready', '账本尚未初始化；请执行 node scripts/seed-cloud.js', 503);
@@ -73,6 +97,7 @@ export class PostgresStore {
     const { doc, version } = await this.#select();
     this.#state = normalizeState(doc, this.market);
     this.#version = version;
+    this.#loadedAtAt = Date.now();
   }
   /** 单文档结构意味着所有写都在同一行上竞争：并发开户/下单一定会撞版本号。
    *  饥饿重试（5 次、10–80ms）在几十个 agent 同时进场的场景下不够用——实测 10 并发开户只成功 3 个。
@@ -91,7 +116,7 @@ export class PostgresStore {
         const updated = await this.sql`UPDATE starhall_state SET doc = ${JSON.stringify(draft)}::jsonb, version = version + 1, updated_at = now()
           WHERE id = 1 AND version = ${version} RETURNING version`;
         if (updated.length) {
-          this.#state = draft; this.#version = Number(updated[0].version);
+          this.#state = draft; this.#version = Number(updated[0].version); this.#loadedAtAt = Date.now(); this.staleSince = null;
           return structuredClone(output);
         }
         this.writeConflicts = (this.writeConflicts || 0) + 1;
@@ -154,7 +179,7 @@ export class PostgresStore {
       RETURNING version, doc`;
     if (!rows.length) return null;
     this.#state = normalizeState(rows[0].doc, this.market);
-    this.#version = Number(rows[0].version);
+    this.#version = Number(rows[0].version); this.#loadedAtAt = Date.now();
     return { account, created: true, token };
   }
   async registerAgent({ handle, name, secret, credits = 100, maxAccounts = 500 }) {

@@ -95,3 +95,48 @@ test('开户回落路径：handle 已存在时仍走通用事务并保留错误�
   const rotated = await store.registerAgent({ handle: 'dup', name: '重复', secret });
   assert.equal(rotated.created, false, '同 handle+同 secret 走轮换');
 });
+
+test('refresh 有 TTL：2 秒内的重复读不再打数据库，force 强制回源', async () => {
+  const state = { version: 1, accounts: [], orders: [], wall: [], memories: {}, practice: [], events: [], ads: [], commercialSignals: [], impressions: [], marketMoves: [], rateLimits: {} };
+  let selects = 0;
+  const sql = (strings) => {
+    const text = strings.join('$?').trim();
+    if (/^SELECT doc, version FROM starhall_state/.test(text)) { selects++; return Promise.resolve([{ doc: state, version: 0 }]); }
+    return Promise.resolve([]);
+  };
+  sql.query = () => Promise.resolve([]);
+  const store = new PostgresStore({ databaseUrl: 'postgresql://user:pass@example.invalid/db' });
+  store.sql = sql;
+  await store.refresh();                       // 第一次：回源
+  await store.refresh();                       // TTL 内：走内存快照
+  await store.refresh();
+  assert.equal(selects, 1, `2 秒内的重复刷新不该再读库，实际读了 ${selects} 次`);
+  await store.refresh({ force: true });        // 强制回源（认证缓存未命中走这条）
+  assert.equal(selects, 2, 'force 必须回源');
+  assert.equal(store.stale, false);
+});
+
+test('数据库不可用时降级：保留最后一份好快照并标记陈旧，而不是整站 500', async () => {
+  const state = { version: 1, accounts: [{ id: 'fan-orion', role: 'customer', tokenHash: 'x', balance: 100 }], orders: [], wall: [], memories: {}, practice: [], events: [], ads: [], commercialSignals: [], impressions: [], marketMoves: [], rateLimits: {} };
+  let fail = false; let selects = 0;
+  const sql = (strings) => {
+    const text = strings.join('$?').trim();
+    if (/^SELECT doc, version FROM starhall_state/.test(text)) {
+      selects++;
+      if (fail) return Promise.reject(new Error('Server error (HTTP status 402): data transfer quota exceeded'));
+      return Promise.resolve([{ doc: state, version: 0 }]);
+    }
+    return Promise.resolve([]);
+  };
+  sql.query = () => Promise.resolve([]);
+  const store = new PostgresStore({ databaseUrl: 'postgresql://user:pass@example.invalid/db' });
+  store.sql = sql;
+  await store.refresh();
+  assert.equal(store.stale, false);
+  fail = true;
+  const snapshot = await store.refresh({ force: true });     // 回源失败，但不应抛
+  assert.equal(selects, 2);
+  assert.equal(snapshot.accounts.length, 1, '读端点仍能拿到最后一份好快照');
+  assert.equal(store.stale, true, '必须如实标记陈旧');
+  assert.match(store.lastError, /quota/);
+});

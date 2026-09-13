@@ -94,7 +94,9 @@ export function createHandler(app, options) {
       if (method === 'GET' && (url.pathname === '/readiness' || url.pathname === '/ready')) {
         const dbReady = await app.store.probe();
         const checks = {
-          store: { ok: Boolean(dbReady), driver: app.store.store, writeConflicts: app.store.writeConflicts ?? 0 },
+          store: { ok: Boolean(dbReady) && !app.store.stale, driver: app.store.store, writeConflicts: app.store.writeConflicts ?? 0,
+            stale: Boolean(app.store.stale), staleSince: app.store.staleSince ? new Date(app.store.staleSince).toISOString() : null,
+            lastLoadedAt: app.store.lastLoadedAt ?? null, lastError: app.store.lastError ?? null },
           model: { ok: options.llm.provider !== 'mock', provider: options.llm.provider, model: options.llm.model || null, fallbackEnabled: Boolean(options.llm.fallback) },
           registration: { ok: Boolean(options.openRegistration), path: '/v1/agents' },
           bookkeeping: { ok: !app.bridge.auditFailed && !app.projectionFailed, auditFailed: Boolean(app.bridge.auditFailed), projectionFailed: Boolean(app.projectionFailed) },
@@ -106,7 +108,9 @@ export function createHandler(app, options) {
       }
       if (method === 'GET' && url.pathname === '/health') {
         const dbReady = await app.store.probe();
-        return send(200, { status: app.bridge.auditFailed || app.projectionFailed || !dbReady ? 'degraded' : 'ok', product: 'StarHall', version: VERSION,
+        const storeStale = Boolean(app.store.stale);
+        return send(200, { status: app.bridge.auditFailed || app.projectionFailed || !dbReady || storeStale ? 'degraded' : 'ok', product: 'StarHall', version: VERSION,
+          storeStale, storeLastLoadedAt: app.store.lastLoadedAt ?? null,
           mode: options.mode || 'local', store: app.store.store, dataSet: app.store.dataSet ?? null, dbReady, round: app.catalog().round.id,
           writeConflicts: app.store.writeConflicts ?? 0,
           kernel: '@aicoo/sharedos@0.1.0-alpha.5', provider: options.llm.provider, fallbackEnabled: options.llm.fallback,
@@ -122,7 +126,16 @@ export function createHandler(app, options) {
         endpoints: { trial: '/v1/test-market/try', buy: '/v1/test-market/orders', ranking: '/v1/test-market/rankings', wallet: '/v1/test-market/wallet' },
         note: '本地虚构竞品，非真实参赛队伍；每个身份另有100模拟市场积分，与StarHall消费独立。进程重启后清零重建。' });
       const auth = req.headers.authorization;
-      const actor = auth ? app.authenticate(auth.startsWith('Bearer ') ? auth.slice(7) : '') : null;
+      let actor = null;
+      if (auth) {
+        const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+        try { actor = app.authenticate(token); }
+        catch (error) {
+          // 快照可能落后（别的实例刚写入身份）：强制回源一次再判，否则新开户的 agent 会白等 2 秒 TTL。
+          await app.store.refresh({ force: true });
+          actor = app.authenticate(token);
+        }
+      }
       if (url.pathname === '/v1/agents' && method !== 'POST') {
         // 浏览器点开这个链接的人（评委/队友）应该看到「怎么调」，而不是一句 401。
         const base = options.publicBaseUrl || '';

@@ -37,7 +37,8 @@ export class StarHall {
         subjective: { refundable: false, remedy: 'ONE_FREE_REVISION', maxRevisions: 1 },
         requestPath: 'POST /v1/orders/{id}/refund', revisionPath: 'POST /v1/orders/{id}/revision',
         text: 'Machine-verifiable delivery guarantee. Failed or contract-violating deliveries are automatically refunded. Successful deliveries are not eligible for subjective change-of-mind refunds. One free revision is available for subjective quality issues.' },
-      maxGenerationAttempts: 2, generationBudgetMs: this.brain.options?.timeoutMs || 45000 };
+      maxGenerationAttempts: 2, generationBudgetMs: this.brain.options?.timeoutMs || 45000,
+      receiptScope: '订单回执内嵌 pieces 与 summary；完整打赏墙请用 GET /v1/wall（免费公开），回执不再复制整堵墙，避免账本随订单数平方膨胀。' };
     const enrich = s => {
       if (s.id === 'summary' || s.id === 'market-board') return { ...s, health: { status: this.bridge.auditFailed ? 'unavailable' : 'available', basis: 'local-ledger-read' } };
       if (s.id === 'sales-pitch') return { ...s, health: serviceGenerationHealth(orders, 'sales-pitch') };
@@ -137,7 +138,7 @@ export class StarHall {
             displayMessage: order.message || (trial ? `免费试投广告：${ad.text.slice(0, 60)}` : `投放广告：${ad.text.slice(0, 60)}`), messageSource: order.message ? 'buyer' : 'system', pinned: false, allocations: {}, createdAt: completedAt };
           state.wall.push(wallEntry); account.balance -= order.price;
           const delivery = { pieces: args.pieces, ad, shoutout: `${account.name} · ${trial ? '免费试用' : `${order.price}分`} · ${s.name}`, wallEntry,
-            ...(state.wall.some(w => w.buyerId === account.id && w.amount > 0) ? { fullWall: structuredClone(state.wall) } : {}), summary: summaryOf(state), simulatedPayment: true };
+            summary: summaryOf(state), simulatedPayment: true };
           order.status = 'delivered'; order.completedAt = completedAt; order.elapsedMs = Date.now() - Date.parse(order.createdAt);
           order.delivery = delivery; order.balanceAfter = account.balance;
           state.events.push({ type: 'order.delivered', orderId: order.id, traceId: ctx.traceId, at: completedAt });
@@ -169,7 +170,7 @@ export class StarHall {
           state.memories[piece.star][account.id].push({ buyerName: account.name, orderId: order.id, service: piece.service, theme: shortMemory(order.input), at: completedAt });
         }
         const delivery = { pieces: args.pieces, shoutout: `${account.name} · ${order.kind === 'trial' ? '免费试用' : `${order.price}分`} · ${s.name}`, wallEntry,
-          ...(state.wall.some(w => w.buyerId === account.id && w.amount > 0) ? { fullWall: structuredClone(state.wall) } : {}), summary: summaryOf(state), simulatedPayment: true };
+          summary: summaryOf(state), simulatedPayment: true };
         const displayable = state.ads.filter(a => !a.starId && activeAd(state, a) && (a.tier === 'ad-spot' || a.tier === 'ad-sponsor'));
         for (const ad of displayable) recordLegacyImpression(state, ad, `order:${order.id}`, 'PASSIVE', 'legacy-delivery');
         const sponsors = displayable.filter(a => a.tier === 'ad-sponsor');
@@ -268,8 +269,10 @@ export class StarHall {
   }
   finishDelivery(state, order, before) {
     if (order.delivery.ad) order.delivery.ad = structuredClone(order.delivery.ad);
-    if (state.orders.some(o => o.buyerId === order.buyerId && eligiblePaid(o))) order.delivery.fullWall = structuredClone(state.wall);
-    else delete order.delivery.fullWall;
+    // 曾经这里给每一笔付费交付内嵌一份整堵墙的快照，导致账本是 O(订单²) 增长：
+    // Neon 免费版 5 GB 数据传输额度就是这样被烧穿的（2026-09-13 实测挂起）。
+    // 墙本来就有专用端点（GET /v1/wall，免费公开），回执不再复制它。
+    delete order.delivery.fullWall;
     recordSignals(state, order);
     recordMarketMove(state, order, before);
     order.delivery.compactMarketBoard = compactBoard(state, `order:${order.id}`, order.delivery.pieces.filter(p => p.star !== 'ledger').map(p => p.star), order.delivery.ad?.id);

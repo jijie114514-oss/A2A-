@@ -23,6 +23,8 @@ export class MemoryStore {
   }
   read() { return structuredClone(this.#state); }
   async refresh() { return this.read(); }
+  get stale() { return false; }
+  get lastLoadedAt() { return new Date().toISOString(); }
   transaction(fn) {
     const work = this.#queue.then(async () => {
       const draft = structuredClone(this.#state);

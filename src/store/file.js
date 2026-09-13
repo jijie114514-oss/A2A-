@@ -20,12 +20,14 @@ export class FileStore {
   #projectionQueue = Promise.resolve();
   #state;
   #lock;
+  #lastLoaded;
   constructor(options = {}) {
     this.dir = options.dataDir || path.resolve('data');
     this.market = options.market || MARKET_DEFAULTS;
     this.mode = options.mode || 'local';
     this.store = 'file';
     this.dataSet = path.basename(this.dir);
+    this.#lastLoaded = new Date().toISOString();
   }
   async open() {
     await mkdir(this.dir, { recursive: true });
@@ -59,6 +61,8 @@ export class FileStore {
   read() { return structuredClone(this.#state); }
   /** file 驱动没有跨实例状态，每请求刷新是空操作（快照就在进程内存里）。 */
   async refresh() { return this.read(); }
+  get stale() { return false; }
+  get lastLoadedAt() { return this.#lastLoaded; }
   transaction(fn) {
     const work = this.#queue.then(async () => {
       const draft = structuredClone(this.#state);
