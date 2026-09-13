@@ -160,7 +160,26 @@
 
 复现：`node scripts/agent-acceptance.js <url>`（含赞助购买与曝光计数）+ `test/ads.test.js`（5 个用例）。
 
-## 十、待办
+## 十、验收分桶（借 ZAAT 的纪律：不许把「服务在听」当成「交付合格」）
+
+参考 `lavine888/ZAAT-MC-Lesson1-teamwork` 的 preflight 口径，把我们的证据也分四桶，**只在本桶证据能观察到该事实时才标 PASS**：
+
+| 桶 | 谁能验 | 我们的证据 | 覆盖什么 |
+| --- | --- | --- | --- |
+| **A. 自动可验** | 任何人 / CI | `npm test`（137 项，memory/file 驱动）；`npm run check`；`.github/workflows/verify.yml` | 账本、授权、幂等、退款、校验器、并发重试、门厅 |
+| **B. 服务端可验（公网）** | 任何人 | `node scripts/deploy-check.js <url>`（14 项）、`node scripts/agent-acceptance.js <url>`（42 项） | 发现、开户、试用、下单、幂等重放、越权、售后、错误语义、轮次与试用政策 |
+| **C. 其他 agent 可验（真实对手）** | 对手的 agent | 买方 Pi agent 的 19 单真实回执（`artifacts/pi-buyer-2026-09-13/`）+ 房间 seq 13/15/17/19 的消息；它提的三条异议已修并有回执 | 跨机、跨网络、真实交付质量、真实异议闭环 |
+| **D. 人类判断** | 评委 / 我们 | 门厅页可读性、公开账本是否可信、`/v1/evidence` 的自我披露是否诚实 | 体验与主张是否可信 |
+
+**明确未验证 / 不在本仓库能力内的**（继续沿用 ZAAT 的"保持 Not verified"原则）：
+
+- **SharedOS Cloud 上报**：权限决策写在我们自己的 Neon 审计表，**没有**接到官方控制台（缺 tenant id / owner address / 事件集成方式）。
+- **托管内核执行**：turn 跑在自托管内核（官方 npm 包）里，未迁到官方托管内核。
+- **快速隧道兜底**：脚本能起隧道，但香港移动网络下快速隧道域名要几分钟才可解析（本机到 1.1.1.1/8.8.8.8 的 DNS 被挡），**端到端未验证**；要已验证的常驻兜底用 Dockerfile + fly.toml 指向同一 Neon。
+- **跨队规则**：单卖方房间里无法验证「≥3 家外队排名 / 跨队消费」，只能在真实竞技场成立。
+- **模型稳定性**：单次调用 7–20 秒、触发修复重试 20–40 秒、provider 超时上限 45 秒；已用「超时与备用交付都不收费」兜底，未消除。
+
+## 十一、待办
 
 - [x] ~~建公开 GitHub 仓库~~（https://github.com/jijie114514-oss/A2A-，`.gitignore` 已挡 `.env` 与 `data/`）
 - [x] ~~部署到公网~~（https://starhall-a2a.vercel.app，Vercel + Neon，见上表与 `docs/DEPLOY-VERCEL-REFACTOR.md`）

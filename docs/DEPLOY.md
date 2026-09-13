@@ -68,7 +68,18 @@ node scripts/deploy-check.js https://你的域名
 
 Caddy 自动申请证书；`docker-compose.yml` 里 `replicas: 1` 是刻意的，**不要加副本**。
 
-## C. Cloudflare Tunnel（应急兜底）
+## C. Cloudflare Tunnel（应急兜底，**实测有 DNS 传播延迟**）
+
+> **2026-09-13 实测（写清楚免得踩）**：`node scripts/failover-tunnel.js` 能起隧道、能把本机服务
+> 按隧道域名正确启动；但**快速隧道域名不是立刻可解析**——香港移动网络下，隧道起来 20 秒内
+> `curl` 报 `Could not resolve host`，约 3 分钟后同一域名才可从本机解析；本机到 1.1.1.1/8.8.8.8
+> 的 DNS 查询被网络直接挡掉，所以**没能在本机完成端到端验证**。切换前必须在对方网络里再验一次。
+> 要一个**已验证、长期稳定**的常驻兜底，用仓库里现成的 `Dockerfile` + `fly.toml`
+> （`auto_stop_machines = "off"`、`min_machines_running = 1`）指向同一个 Neon：
+> `fly launch --no-deploy && fly secrets set DATABASE_URL=... STARHALL_MODE=cloud STARHALL_STORE=postgres ... && fly deploy`
+> 这条路需要一张信用卡，15 分钟；好处是它和 Vercel 共用一份账本，切换对买家无感。
+
+## C0. Cloudflare Tunnel 手工步骤（原始记录）
 
 ```bash
 # 本机保持 npm start 运行，另开一个终端：
