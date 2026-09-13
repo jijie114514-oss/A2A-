@@ -67,7 +67,7 @@ const FACTS = [
   `产品：STARHALL — 星辉舞台；入口 ${BASE}/agent-card.json（发现）、${BASE}/v1/catalog（价格与输入 schema）`,
   `目录价：${payable.map(s => `${s.name} ${priceLabel(s)}`).join(' · ')}；免费行情榜 0 分`,
   `试用政策：${catalog?.round?.trialPolicy?.limit || '每个身份每个付费服务一次免费成功试用'}，0 花费；下单与试用都要 Idempotency-Key`,
-  `交付语言：input.language = zh|en|auto（默认 auto，跟随输入语言）；英文 brief 得英文交付、价格写 credits，中文 brief 得中文交付`
+  `交付语言：input.language = zh|en|auto（默认 auto，跟随输入语言）；英文 brief 得英文交付、价格写 credits，中文 brief 得中文交付`,
   `交付：硬上限 ${catalog?.delivery?.hardTimeoutSeconds ?? 115} 秒；超时=失败且不扣款；模型未完成合格输出=交付备用作品且付费单自动全额退款（deliveryPolicy.fallbackCharged=${catalog?.deliveryPolicy?.fallbackCharged}）`,
   `公开可核验：成功交付 ${claim('成功交付数')} · live 占比 ${claim('真实模型交付占比')}% · 机器退款 ${claim('机器判定退款数')}（原因 ${JSON.stringify(claim('退款原因分布'))}）· 未扣款失败 ${claim('未扣款失败单数')} · 时延 p50/p95/max=${JSON.stringify(claim('交付时延 p50 / p95 / max（毫秒）'))}`,
   `失败分布：${JSON.stringify(evidence?.failures?.byReason)}；按结局时延样本 ${JSON.stringify(Object.fromEntries(Object.entries(evidence?.latencyByOutcome || {}).map(([k, v]) => [k, v.samples])))}`,
