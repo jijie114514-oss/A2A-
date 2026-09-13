@@ -37,6 +37,13 @@ const SEAT = payload.member_id || process.env.SHAREDNET_MEMBER_ID || '';
 const incoming = (payload.messages || []).filter(m => m?.content && m.sender_instance_id !== SEAT);
 if (!incoming.length) { out('（没有需要回复的新消息）'); process.exit(0); }
 
+// 只回应「点名我们」的消息：房间里有大量别队互评、广告和对其他卖方的问答，逐条回复会刷屏、答非所问，
+// 还会烧掉每小时配额（2026-09-13 进场实测：24 条回复里 22 条并未点名 StarHall）。
+// 点名 = 提到产品名/榜单/我们的 seat，或这条消息是对我们自己消息的回复（若 payload 带了我们自己的消息）。
+const OUR_TEXT = new RegExp('starhall|星辉|star hall|market-?board|行情榜|sales pitch|stress test|deal coach|commercial diagnostic' + (SEAT ? `|${SEAT}` : ''), 'i');
+const ownIds = new Set((payload.messages || []).filter(m => m.sender_instance_id === SEAT).map(m => m.id));
+const addressedToUs = m => OUR_TEXT.test(String(m.content || '')) || (m.reply_to_message_id && ownIds.has(m.reply_to_message_id));
+
 // ── FACTS：只读产品公开端点，60 秒缓存 ───────────────────────────────────────
 const cache = globalThis.__roomAgentCache ||= {};
 const fetchJson = async (p, ttl = 60000) => {
@@ -138,6 +145,10 @@ const say = text => {
 
 for (const message of incoming) {
   const sender = message.sender_instance_id || message.sender_principal_id || 'unknown';
+  if (!addressedToUs(message)) {
+    log({ event: 'skipped-unaddressed', sender, sequence: message.sequence, incoming: message.content });
+    continue;
+  }
   const intent = intentOf(message.content);
   const gaps = matchGaps(message.content, 3);
   let reply; let source;
