@@ -78,11 +78,23 @@ export function normalizeSales(source, service, input) {
     for (const match of claims.matchAll(pattern)) valid(material.includes(match[0]), '回复虚构未提供的数据处理政策、安全保证或效果对比；只能核对实际政策或建议实测，不能替卖家保证');
   }
   valid(!/美元|人民币|欧元|USD|RMB|CNY|EUR|\$\s*\d/i.test(body), '价格单位只能为本地积分，不得替换为美元或其他法币');
+  // 价格出现形式要按模型实际中文写法判定，而不是只认一种模板。
+  // 真实模型写过「9本地积分」「9 个积分」「报价 9 分」「9 credits」——都算用到了输入价格；
+  // 而「5分钟」「9折」这种不是报价，不能当证据（所以 分 后面要排除 钟）。
+  const UNIT = '积分|credits?|points?|分(?!钟)';
+  const CONNECTOR = '(?:本地|平台|个|枚|点|的)?';
+  const priceReference = value => {
+    const literal = String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(`(?<![\\d.])${literal}(?![\\d.])\\s*${CONNECTOR}\\s*(?:${UNIT})`, 'i');
+  };
   if (input.price !== undefined) {
-    valid(new RegExp(`${String(input.price).replace('.', '\\.')}\\s*(?:积分|credits)`, 'i').test(body), '需要在实际正文使用输入的价格及积分单位');
-    for (const match of body.matchAll(/(\d+(?:\.\d+)?)\s*(?:积分|credits)/gi)) valid(Number(match[1]) === input.price, '不得自行添加未提供的积分报价或折扣');
+    valid(priceReference(input.price).test(body), `需要在实际正文使用输入的价格及积分单位（例如「${input.price} 积分」或「${input.price} 分」）`);
+    for (const match of body.matchAll(new RegExp(`(\\d+(?:\\.\\d+)?)\\s*${CONNECTOR}\\s*(?:${UNIT})`, 'gi'))) valid(Number(match[1]) === input.price, '不得自行添加未提供的积分报价或折扣');
   }
-  for (const value of [input.productName, input.price]) if (value !== undefined) valid(body.includes(String(value)), '未使用输入产品名或价格');
+  // 产品名/价格必须真的出现在交付里，但空格与大小写不该成为失败原因：
+  // 输入「MCP 自检」而模型写「MCP自检」是在使用同一个名字，不是没用。
+  const squash = text => String(text).replace(/[\s\u3000]+/g, '').toLowerCase();
+  for (const value of [input.productName, input.price]) if (value !== undefined) valid(squash(body).includes(squash(value)), '未使用输入产品名或价格');
   const result = finish(service, work, input);
   result.inputComparison = checkGrounding(result, service, input);
   return { work: result, normalizations: [] };
