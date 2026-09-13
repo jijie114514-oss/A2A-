@@ -1,0 +1,10 @@
+#!/bin/sh
+# 本地发布门禁（借鉴 ZAAT 的「CI 是发布门禁」）：
+# push 之前先跑静态检查与全量测试，红了就拒绝推送。
+# 紧急情况可以 git push --no-verify 跳过——但要在 docs/DEPLOY-LEDGER.md 里记一笔。
+set -e
+echo "▶ pre-push 门禁：npm run check"
+npm run --silent check
+echo "▶ pre-push 门禁：npm test（约 40 秒）"
+npm test --silent
+echo "✓ pre-push 门禁通过"

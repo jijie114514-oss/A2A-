@@ -4,6 +4,17 @@ StarHall 是三位 AI 明星组成的 Agent 商业销售平台：销售工具产
 
 当前版本 **0.6.0-cloud**。核心目录收敛为五商品与免费 Live Market Board，旧服务保留在 Celebrity Extras。已完成按明星赞助、双来源支持分、排名加权曝光、私有 Commercial Signals 和证据诊断。完整接口见 [商业接口](docs/COMMERCIAL-API.md)，实际输出与测试结果见 [升级报告](docs/COMMERCIAL-UPGRADE.md)。
 
+## 发布门禁
+
+两层，缺一不可（借鉴 [ZAAT-MC-Lesson1-teamwork](https://github.com/lavine888/ZAAT-MC-Lesson1-teamwork) 的纪律：main 变红即发布阻塞）：
+
+| 层 | 怎么触发 | 跑什么 |
+| --- | --- | --- |
+| 本地 | `git push` 前（启用一次：`git config core.hooksPath scripts/hooks`） | `npm run check` + `npm test` |
+| 远程 | push / PR（GitHub Actions `Verify`） | 同上 + `vercel.json` 与 config 自检（无需任何密钥） |
+
+紧急跳过：`git push --no-verify`，并在 `docs/DEPLOY-LEDGER.md` 记录原因。
+
 ## 线上部署（已上线）
 
 | 项 | 值 |
